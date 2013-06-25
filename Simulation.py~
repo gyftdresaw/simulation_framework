@@ -32,23 +32,6 @@ class InternalModel:
             self.params_set = True
         def apply(self,x):
             return self.C * x
-    class HillActivation:
-        def __init__(self,is_mod=False,mod_type=None,params=None):
-            self.num_params = 3 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = is_mod
-            self.mod_type = mod_type
-            if not params is None:
-                self.set_params(params)
-        # C (x/A)^n / (1 + (x/A)^n)
-        # params order: [C A n]
-        def set_params(self,params):
-            self.C = params[0]
-            self.A = params[1]
-            self.n = params[2]
-            self.params_set = True
-        def apply(self,x):
-            return ( self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) )
     # degradation classes
     class LinearDegradation:
         def __init__(self,params=None):
@@ -168,8 +151,6 @@ class InternalModel:
             return self.ConstantProduction(params)
         elif type == 'lin_activ':
             return self.LinearActivation(is_mod,mod_type,params)
-        elif type == 'hill_activ':
-            return self.HillActivation(is_mod,mod_type,params)
         else:
             return None
 
@@ -517,7 +498,6 @@ IM.add_edge('b',eid,'lin_activ',is_mod=True,mod_type='mult',params=[10])
 
 IM2 = InternalModel()
 IM2.add_node('c','parabolic',[2])
-IM2.add_edge('c','c','hill_activ',params=[3,1,2])
 
 cell1 = Cell()
 cell2 = Cell()
@@ -533,7 +513,7 @@ sim.set_internal_model([0,1],im_id)
 sim.set_initial_conditions([0],{'a':5,'b':5})
 sim.set_initial_conditions([1],{'a':10,'b':10})
 sim.set_internal_model([2],im2_id)
-sim.set_initial_conditions([2],{'c':0.2})
+sim.set_initial_conditions([2],{'c':7})
 
 
 t = np.linspace(0,10,100)
