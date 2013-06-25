@@ -2,7 +2,7 @@
 # Framework for cell-network simulations using scipy/numpy
 import numpy as np
 from scipy.integrate import odeint
-
+import scipy.spatial.distance as dist
 
 class InternalModel:
     # need constant prefactors
@@ -253,11 +253,92 @@ class Cell:
     
 
 class Simulation:
+    # interaction classes
+    class Diffusion:
+        # connections is a (total_cells x total_cells) boolean matrix 
+        # defining which cells interact
+        # True for interaction
+        def __init__(self,connections,cells,params=None):
+            self.external = True
+            self.num_params = 1 # includes constant prefactor
+            self.params_set = False
+            self.is_mod = False
+            self.mod_type = None
+            if not params is None:
+                self.set_params(params)
+            # precalculate distance prefactors
+            self.dist_pre = None # (total_cells x total_cells)
+            self.set_dist_pre(cells)
+            self.cmask = ~connections # in mask, True removes the entry
+        def set_dist_pre(self,cells):
+            # should maybe check that all cells have a position set
+            # we're going to use scipy distance helpers
+            # imported as dist
+            pos = np.array([c.position for c in cells])
+
+            # square euclidean distance
+            cond_dist = dist.pdist(pos,'sqeuclidean')
+            distances = dist.squareform(cond_dist)
+
+            # mask so inversion doesn't break anything
+            masked_dists = np.ma.array(distances,fill_value=0)
+            invert_dists = 1.0/masked_dists
+            self.dist_pre = invert_dists.filled()
+            return
+        def set_params(self,params):
+            self.C = params[0]
+            self.params_set = True
+        # x is an (im_num_cells x total_cells) input matrix
+        # im_bounds is a tuple which says which cells this IM corresponds to
+        def apply(self,x,im_bounds):
+            lower,upper = im_bounds
+            # need to extract levels inside cells
+            inner_levels = np.diag(x[:,lower:upper])
+            
+            # this is kind of a hack
+            # should subtract each column elementwise by inner_levels
+            level_diff = np.subtract(np.transpose(x),inner_levels).transpose()
+            
+            # multiply through by distance prefactors and constant
+            diff_contribs = self.C * self.dist_pre[lower:upper,:] * level_diff
+            # apply connection mask
+            cmask_slice = self.cmask[lower:upper,:]
+            masked_contribs = np.ma.array(diff_contribs,mask=cmask_slice,fill_value=0)
+
+            # finally just sum along the rows
+            # filling in 0 for masked entries
+            return np.sum(masked_contribs.filled(),axis=1)
+
+    # wrapper for interactions
+    class Interaction:
+        # IM_id only relevant if interaction is a mod of an internal edge
+        def __init__(self,from_node,to,model,int_id,IM_id=None):
+            self.external = True
+            self.from_node = from_node
+            # either (node -> node) (is_mod is False)
+            # or (node -> edge) -- where edge can be internal or external
+            if model.is_mod:
+                self.to_node = None
+                self.to_edge = to
+                self.to_IM = IM_id # if IM_id is None, then refers to interaction
+            else:
+                self.to_node = to
+                self.to_edge = None
+                self.to_IM = None
+
+            self.is_mod = model.is_mod
+            self.mod_type = model.mod_type # 'intern' or 'mult'
+
+            self.model = model
+            self.int_id = int_id
+
     def __init__(self):
         self.cells = [] # cell list
         self.IMs = [] # list of internal models for cells
         self.IM_cells = [] # list of list of cell ids associated with each IM
         self.IM_bounds = [] # list of tuples denoting cell bounds
+        self.interactions = [] # list of cell-cell interactions
+        self.int_counter = 0 # for generating int_id's
         
     def add_cell(self,cell):
         self.cells.append(cell)
@@ -292,8 +373,18 @@ class Simulation:
     # def set_prefactors(self,IM):
     #     return
 
-    def add_interaction(self):
-        return
+    def get_int_model(self,type,connections,is_mod=False,mod_type=None,params=None):
+        if type == 'diffusion':
+            return self.Diffusion(connections,self.cells,params)
+        else:
+            return None
+              
+    def add_interaction(self,from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None):
+        int_id = self.int_counter
+        self.int_counter += 1
+        new_model = self.get_int_model(type,connections,is_mod,mod_type,params)
+        new_interaction = self.Interaction(from_node,to,new_model,int_id,IM_id)
+        return int_id
 
     def num_cells(self):
         return len(self.cells)
@@ -332,14 +423,15 @@ class Simulation:
         self.IM_bounds = bounds
         return
 
+
     # return all external interactions that affect this node
-    def get_contributions(self,to_node,IM_id):        
-        return []
+    def get_contributions(self,to_node):
+        return [i for i in self.interactions if i.to_node == to_node]
     
     # if IM_id is given, then we're looking for modifiers to an internal edge
     # if not, then we're looking for modifiers to an external edge
     def get_modifiers(self,to_edge,IM_id = None):
-        return []
+        return [i for i in self.interactions if i.to_edge==to_edge and i.IM_id==IM_id]
 
     # recursively resolve the contribution 
     # IM_id is relevant, tells us for which cells we're calculating for 
@@ -372,8 +464,9 @@ class Simulation:
             # mods to xcontrib
             for mod in ext_mods:
                 if mod.mod_type == 'intern':
+                    # multiply rows of xcontrib through by mod_contrib
                     mod_contrib = resolve_contribution(mod,ycurrent,IM_id)
-                    xcontrib *= np.tile(mod_contrib,(total_cells,1)).transpose()
+                    xcontrib = np.dot(np.diag(mod_contrib),xcontrib)
 
             # apply xcontrib, then multiply by multiplicative mods
             # for application need proper bounds
