@@ -605,31 +605,3 @@ class Simulation:
 
         return cdata
 
-
-# diffusion testing
-IM = InternalModel()
-IM.add_node('a',params=[5])
-
-cell1 = Cell([0])
-cell2 = Cell([1])
-cell3 = Cell([3])
-
-sim = Simulation()
-sim.add_cell(cell1)
-sim.add_cell(cell2)
-sim.add_cell(cell3)
-
-im_id = sim.add_internal_model(IM)
-
-connections = np.array([[True,True,False],[True,True,True],[False,True,True]])
-
-sim.set_internal_model([0,1,2],im_id)
-sim.add_interaction('a','a','diffusion',connections,params=[1])
-
-sim.set_initial_conditions([0],{'a':0})
-sim.set_initial_conditions([1],{'a':6})
-sim.set_initial_conditions([2],{'a':0})
-
-t = np.linspace(0,10,100)
-cdata = sim.simulate(t)
-
