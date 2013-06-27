@@ -189,13 +189,14 @@ class InternalModel:
 
     # helper to make sure we've set all our parameters
     def all_params_set(self):
-        # only check for degradation on nodes that degrade
-        deg_nodes = [n for n in self.nodes if n.degrades]
-        deg_set = [n.degradation.params_set for n in deg_nodes]
+        # degradation are included in edges
         edges_set = [e.model.params_set for e in self.edges]
         
         # shortcut for and-ing together params_set
-        return reduce(lambda x,y: x and y, deg_set + edges_set)
+        if len(edges_set) > 0:
+            return reduce(lambda x,y: x and y, edges_set)
+        else:
+            return True
     
     # return all edges that contribute to a nodes dynamics
     def get_contributions(self,to_node):
@@ -212,8 +213,10 @@ class InternalModel:
         return 
 
 class Cell:
-    def __init__(self):
+    def __init__(self,position=None):
         self.position = None
+        if not position is None:
+            self.set_pos(position)
         self.IM = None # internal model for cell
         self.IC = None # initial conditions 
         self.num_species = 0 # number of dynamic species in cell
@@ -281,8 +284,9 @@ class Simulation:
             distances = dist.squareform(cond_dist)
 
             # mask so inversion doesn't break anything
-            masked_dists = np.ma.array(distances,fill_value=0)
-            invert_dists = 1.0/masked_dists
+            dmask = (distances == 0.0) # so we don't get that annoying divide by zero
+            masked_dists = np.ma.array(distances,mask = dmask,fill_value=0)
+            invert_dists = np.ma.divide(1.0,masked_dists)
             self.dist_pre = invert_dists.filled()
             return
         def set_params(self,params):
@@ -384,6 +388,7 @@ class Simulation:
         self.int_counter += 1
         new_model = self.get_int_model(type,connections,is_mod,mod_type,params)
         new_interaction = self.Interaction(from_node,to,new_model,int_id,IM_id)
+        self.interactions.append(new_interaction)
         return int_id
 
     def num_cells(self):
@@ -441,14 +446,14 @@ class Simulation:
         # applying them will require different data depending
         if contrib.external:
             # only external modifiers possible on external contributions
-            ext_mods = self.get_modifiers(contrib.edge_id) # no IM_Id needed
+            ext_mods = self.get_modifiers(contrib.int_id) # no IM_Id needed
             
             # need to construct xcontrib
             # which will be (IM_num_cells x total_num_cells)
             # note: np.append copies the array
             xdata = np.array([])
             for i in xrange(len(self.IMs)):
-                if contrib.from_node in self.IMs[i]:
+                if contrib.from_node in self.IMs[i].node_names:
                     from_id = self.IMs[i].get_node_id(contrib.from_node)
                     xdata = np.append(xdata,ycurrent[i][:,from_id])
                 else:
@@ -541,7 +546,7 @@ class Simulation:
                 # find all interactions that end on this node
                 # there can be two sources: internal and external
                 int_contributions = self.IMs[i].get_contributions(cnodes[j])
-                ext_contributions = self.get_contributions(cnodes[j],i) # need this
+                ext_contributions = self.get_contributions(cnodes[j]) # need this
 
                 # add up all contributions
                 # resolve contribution will deal with modifier business
@@ -601,33 +606,29 @@ class Simulation:
         return cdata
 
 
-# some testing
+# diffusion testing
 IM = InternalModel()
-IM.add_node('a','linear',[5])
-IM.add_node('b','parabolic',[0.5])
-eid = IM.add_edge('a','a','const_prod',params=[2])
-IM.add_edge('b',eid,'lin_activ',is_mod=True,mod_type='mult',params=[10])
+IM.add_node('a',params=[5])
 
-IM2 = InternalModel()
-IM2.add_node('c','parabolic',[2])
-IM2.add_edge('c','c','hill_activ',params=[3,1,2])
+cell1 = Cell([0])
+cell2 = Cell([1])
+cell3 = Cell([3])
 
-cell1 = Cell()
-cell2 = Cell()
-cell3 = Cell()
 sim = Simulation()
 sim.add_cell(cell1)
 sim.add_cell(cell2)
 sim.add_cell(cell3)
+
 im_id = sim.add_internal_model(IM)
-im2_id = sim.add_internal_model(IM2)
 
-sim.set_internal_model([0,1],im_id)
-sim.set_initial_conditions([0],{'a':5,'b':5})
-sim.set_initial_conditions([1],{'a':10,'b':10})
-sim.set_internal_model([2],im2_id)
-sim.set_initial_conditions([2],{'c':0.2})
+connections = np.array([[True,True,False],[True,True,True],[False,True,True]])
 
+sim.set_internal_model([0,1,2],im_id)
+sim.add_interaction('a','a','diffusion',connections,params=[1])
+
+sim.set_initial_conditions([0],{'a':0})
+sim.set_initial_conditions([1],{'a':6})
+sim.set_initial_conditions([2],{'a':0})
 
 t = np.linspace(0,10,100)
 cdata = sim.simulate(t)

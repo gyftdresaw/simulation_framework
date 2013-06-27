@@ -2,7 +2,7 @@
 # Framework for cell-network simulations using scipy/numpy
 import numpy as np
 from scipy.integrate import odeint
-
+import scipy.spatial.distance as dist
 
 class InternalModel:
     # need constant prefactors
@@ -189,13 +189,14 @@ class InternalModel:
 
     # helper to make sure we've set all our parameters
     def all_params_set(self):
-        # only check for degradation on nodes that degrade
-        deg_nodes = [n for n in self.nodes if n.degrades]
-        deg_set = [n.degradation.params_set for n in deg_nodes]
+        # degradation are included in edges
         edges_set = [e.model.params_set for e in self.edges]
         
         # shortcut for and-ing together params_set
-        return reduce(lambda x,y: x and y, deg_set + edges_set)
+        if len(edges_set) > 0:
+            return reduce(lambda x,y: x and y, edges_set)
+        else:
+            return True
     
     # return all edges that contribute to a nodes dynamics
     def get_contributions(self,to_node):
@@ -212,8 +213,10 @@ class InternalModel:
         return 
 
 class Cell:
-    def __init__(self):
+    def __init__(self,position=None):
         self.position = None
+        if not position is None:
+            self.set_pos(position)
         self.IM = None # internal model for cell
         self.IC = None # initial conditions 
         self.num_species = 0 # number of dynamic species in cell
@@ -253,11 +256,92 @@ class Cell:
     
 
 class Simulation:
+    # interaction classes
+    class Diffusion:
+        # connections is a (total_cells x total_cells) boolean matrix 
+        # defining which cells interact
+        # True for interaction
+        def __init__(self,connections,cells,params=None):
+            self.external = True
+            self.num_params = 1 # includes constant prefactor
+            self.params_set = False
+            self.is_mod = False
+            self.mod_type = None
+            if not params is None:
+                self.set_params(params)
+            # precalculate distance prefactors
+            self.dist_pre = None # (total_cells x total_cells)
+            self.set_dist_pre(cells)
+            self.cmask = ~connections # in mask, True removes the entry
+        def set_dist_pre(self,cells):
+            # should maybe check that all cells have a position set
+            # we're going to use scipy distance helpers
+            # imported as dist
+            pos = np.array([c.position for c in cells])
+
+            # square euclidean distance
+            cond_dist = dist.pdist(pos,'sqeuclidean')
+            distances = dist.squareform(cond_dist)
+
+            # mask so inversion doesn't break anything
+            masked_dists = np.ma.array(distances,fill_value=0)
+            invert_dists = 1.0/masked_dists
+            self.dist_pre = invert_dists.filled()
+            return
+        def set_params(self,params):
+            self.C = params[0]
+            self.params_set = True
+        # x is an (im_num_cells x total_cells) input matrix
+        # im_bounds is a tuple which says which cells this IM corresponds to
+        def apply(self,x,im_bounds):
+            lower,upper = im_bounds
+            # need to extract levels inside cells
+            inner_levels = np.diag(x[:,lower:upper])
+            
+            # this is kind of a hack
+            # should subtract each column elementwise by inner_levels
+            level_diff = np.subtract(np.transpose(x),inner_levels).transpose()
+            
+            # multiply through by distance prefactors and constant
+            diff_contribs = self.C * self.dist_pre[lower:upper,:] * level_diff
+            # apply connection mask
+            cmask_slice = self.cmask[lower:upper,:]
+            masked_contribs = np.ma.array(diff_contribs,mask=cmask_slice,fill_value=0)
+
+            # finally just sum along the rows
+            # filling in 0 for masked entries
+            return np.sum(masked_contribs.filled(),axis=1)
+
+    # wrapper for interactions
+    class Interaction:
+        # IM_id only relevant if interaction is a mod of an internal edge
+        def __init__(self,from_node,to,model,int_id,IM_id=None):
+            self.external = True
+            self.from_node = from_node
+            # either (node -> node) (is_mod is False)
+            # or (node -> edge) -- where edge can be internal or external
+            if model.is_mod:
+                self.to_node = None
+                self.to_edge = to
+                self.to_IM = IM_id # if IM_id is None, then refers to interaction
+            else:
+                self.to_node = to
+                self.to_edge = None
+                self.to_IM = None
+
+            self.is_mod = model.is_mod
+            self.mod_type = model.mod_type # 'intern' or 'mult'
+
+            self.model = model
+            self.int_id = int_id
+
     def __init__(self):
         self.cells = [] # cell list
         self.IMs = [] # list of internal models for cells
         self.IM_cells = [] # list of list of cell ids associated with each IM
         self.IM_bounds = [] # list of tuples denoting cell bounds
+        self.interactions = [] # list of cell-cell interactions
+        self.int_counter = 0 # for generating int_id's
         
     def add_cell(self,cell):
         self.cells.append(cell)
@@ -292,9 +376,19 @@ class Simulation:
     # def set_prefactors(self,IM):
     #     return
 
-    #TODO
-    def add_interaction(self):
-        return
+    def get_int_model(self,type,connections,is_mod=False,mod_type=None,params=None):
+        if type == 'diffusion':
+            return self.Diffusion(connections,self.cells,params)
+        else:
+            return None
+              
+    def add_interaction(self,from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None):
+        int_id = self.int_counter
+        self.int_counter += 1
+        new_model = self.get_int_model(type,connections,is_mod,mod_type,params)
+        new_interaction = self.Interaction(from_node,to,new_model,int_id,IM_id)
+        self.interactions.append(new_interaction)
+        return int_id
 
     def num_cells(self):
         return len(self.cells)
@@ -333,14 +427,15 @@ class Simulation:
         self.IM_bounds = bounds
         return
 
+
     # return all external interactions that affect this node
-    def get_contributions(self,to_node,IM_id):        
-        return []
+    def get_contributions(self,to_node):
+        return [i for i in self.interactions if i.to_node == to_node]
     
     # if IM_id is given, then we're looking for modifiers to an internal edge
     # if not, then we're looking for modifiers to an external edge
     def get_modifiers(self,to_edge,IM_id = None):
-        return []
+        return [i for i in self.interactions if i.to_edge==to_edge and i.IM_id==IM_id]
 
     # recursively resolve the contribution 
     # IM_id is relevant, tells us for which cells we're calculating for 
@@ -350,7 +445,7 @@ class Simulation:
         # applying them will require different data depending
         if contrib.external:
             # only external modifiers possible on external contributions
-            ext_mods = self.get_modifiers(contrib.edge_id) # no IM_Id needed
+            ext_mods = self.get_modifiers(contrib.int_id) # no IM_Id needed
             
             # need to construct xcontrib
             # which will be (IM_num_cells x total_num_cells)
@@ -373,8 +468,9 @@ class Simulation:
             # mods to xcontrib
             for mod in ext_mods:
                 if mod.mod_type == 'intern':
+                    # multiply rows of xcontrib through by mod_contrib
                     mod_contrib = resolve_contribution(mod,ycurrent,IM_id)
-                    xcontrib *= np.tile(mod_contrib,(total_cells,1)).transpose()
+                    xcontrib = np.dot(np.diag(mod_contrib),xcontrib)
 
             # apply xcontrib, then multiply by multiplicative mods
             # for application need proper bounds
@@ -449,7 +545,7 @@ class Simulation:
                 # find all interactions that end on this node
                 # there can be two sources: internal and external
                 int_contributions = self.IMs[i].get_contributions(cnodes[j])
-                ext_contributions = self.get_contributions(cnodes[j],i) # need this
+                ext_contributions = self.get_contributions(cnodes[j]) # need this
 
                 # add up all contributions
                 # resolve contribution will deal with modifier business
@@ -509,32 +605,26 @@ class Simulation:
         return cdata
 
 
-# some testing
+# diffusion testing
 IM = InternalModel()
-IM.add_node('a','linear',[5])
-IM.add_node('b','parabolic',[0.5])
-eid = IM.add_edge('a','a','const_prod',params=[2])
-IM.add_edge('b',eid,'lin_activ',is_mod=True,mod_type='mult',params=[10])
+IM.add_node('a',params=[5])
 
-IM2 = InternalModel()
-IM2.add_node('c','parabolic',[2])
-IM2.add_edge('c','c','hill_activ',params=[3,1,2])
+cell1 = Cell([0])
+cell2 = Cell([1])
 
-cell1 = Cell()
-cell2 = Cell()
-cell3 = Cell()
 sim = Simulation()
 sim.add_cell(cell1)
 sim.add_cell(cell2)
-sim.add_cell(cell3)
+
 im_id = sim.add_internal_model(IM)
-im2_id = sim.add_internal_model(IM2)
+
+connections = np.array([[True,True],[True,True]])
 
 sim.set_internal_model([0,1],im_id)
-sim.set_initial_conditions([0],{'a':5,'b':5})
-sim.set_initial_conditions([1],{'a':10,'b':10})
-sim.set_internal_model([2],im2_id)
-sim.set_initial_conditions([2],{'c':0.2})
+sim.add_interaction('a','a','diffusion',connections,params=[1])
+
+sim.set_initial_conditions([0],{'a':5})
+sim.set_initial_conditions([1],{'a':0})
 
 
 t = np.linspace(0,10,100)
