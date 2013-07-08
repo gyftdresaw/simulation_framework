@@ -284,8 +284,9 @@ class Simulation:
             distances = dist.squareform(cond_dist)
 
             # mask so inversion doesn't break anything
-            masked_dists = np.ma.array(distances,fill_value=0)
-            invert_dists = 1.0/masked_dists
+            dmask = (distances == 0.0) # so we don't get that annoying divide by zero
+            masked_dists = np.ma.array(distances,mask = dmask,fill_value=0)
+            invert_dists = np.ma.divide(1.0,masked_dists)
             self.dist_pre = invert_dists.filled()
             return
         def set_params(self,params):
@@ -452,7 +453,7 @@ class Simulation:
             # note: np.append copies the array
             xdata = np.array([])
             for i in xrange(len(self.IMs)):
-                if contrib.from_node in self.IMs[i]:
+                if contrib.from_node in self.IMs[i].node_names:
                     from_id = self.IMs[i].get_node_id(contrib.from_node)
                     xdata = np.append(xdata,ycurrent[i][:,from_id])
                 else:
@@ -603,30 +604,4 @@ class Simulation:
                 sol_index += IM_nspecies[i]
 
         return cdata
-
-
-# diffusion testing
-IM = InternalModel()
-IM.add_node('a',params=[5])
-
-cell1 = Cell([0])
-cell2 = Cell([1])
-
-sim = Simulation()
-sim.add_cell(cell1)
-sim.add_cell(cell2)
-
-im_id = sim.add_internal_model(IM)
-
-connections = np.array([[True,True],[True,True]])
-
-sim.set_internal_model([0,1],im_id)
-sim.add_interaction('a','a','diffusion',connections,params=[1])
-
-sim.set_initial_conditions([0],{'a':5})
-sim.set_initial_conditions([1],{'a':0})
-
-
-t = np.linspace(0,10,100)
-cdata = sim.simulate(t)
 

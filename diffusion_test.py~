@@ -5,7 +5,7 @@ IM = InternalModel()
 IM.add_node('a') # no degradation
 
 IM2 = InternalModel()
-IM2.add_node('a','linear',params=[0.5])
+IM2.add_node('a','linear',params=[0.5]) # no degradation
 IM2.add_node('b','linear',params=[1])
 eid = IM2.add_edge('b','b','hill_activ',params=[1,1,2])
 IM2.add_edge('a',eid,'lin_activ',is_mod=True,mod_type='mult',params=[5])
