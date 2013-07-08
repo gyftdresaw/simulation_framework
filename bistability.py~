@@ -1,0 +1,9 @@
+
+from Simulation import *
+
+# exclusive bistability test:
+# two nodes inhibiting one another
+
+IM = InternalModel()
+IM.add_node('a','linear',[0.2])
+IM.add_node('b','linear',[0.2])
