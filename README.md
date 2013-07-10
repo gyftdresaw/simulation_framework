@@ -37,9 +37,12 @@ Next, we specify the interactions (edges) amongst the species in our network:
 ```Python
 IM.add_edge('a','a','const_prod',params=[5.0])       # 'a' is produced at a constant rate
 IM.add_edge('a','b','hill_activ',params=[5.0,1.0,2]) # 'a' activates 'b'
-IM.add_edge('b','c','hill_activ',params=[6.0,1.0,8]) # 'b' activates 'c'
+IM.add_edge('b','c','hill_activ',params=[6.0,1.0,8]) # 'b' activates 'c' (with a sharper cutoff)
 ```
 
+To add an internal interaction (edge) to an `InternalModel`, we call `IM.add_edge(from_node,to,edge_type,is_mod=False,mod_type=None,params=None)`. All internal interactions originate from some node `from_node` and affect either another node or another edge specifie by `to`. Here, we specify 3 node-node interactions, so both `from_node` and `to` are species string identifiers. 
+
+The string `edge_type` specifies the type of interaction and `params` sets the parameters associated with these interactions. Currently the choices of interactions are *'const_prod','lin_activ','hill_activ','hill_inactiv'*; adding new types of interactions is easy and discussed further below. Adding a *'hill_activ'* edge with `params=[C A n]`, corresponds to adding a term *C ([from_node]/A)^n / ( 1 + ([from_node]/A)^n)* to *d[to]/dt*. 
 
 
 
