@@ -78,7 +78,7 @@ cell_id = sim.add_cell(cell)       # add the cell to the simulation framework
 im_id = sim.add_internal_model(IM) # add the internal model to the simulation framework
 ```
 
-If we wanted to make a cell with a position (perhaps for diffusion), we would have simply needed to fill in the `position` argument in the call `Cell(position=None)`. We need to add each cell and each internal model we want to simulate to the `Simulation` object; the calls `sim.add_cell(...)` and `sim.add_internal_model(...)` both return corresponding integer id's for identification. 
+If we wanted to make a cell with a position (perhaps for diffusion), we would have simply needed to fill in the `position` argument in the call `Cell(position=None)`. We need to add each cell and each internal model we want to simulate to the `Simulation` object; the calls `sim.add_cell(...)` and `sim.add_internal_model(...)` both return corresponding integer id's (starting at 0) for identification. 
 
 After adding the cells and internal models to the `Simulation` object, we need to specify which cells are governed by which internal models and also set the cells initial conditions:
 
@@ -87,11 +87,23 @@ sim.set_internal_model([cell_id],im_id)
 sim.set_initial_conditions([cell_id],{'a':0.1,'b':0.0,'c':0.0})
 ```
 
+The call `sim.set_internal_model(cell_id_list,im_id)` tells the `Simulation` object that each cell corresponding to the cell id's in `cell_id_list` have the internal model corresponding to `im_id`. Similarly, the call `sim.set_initial_conditions(cell_id_list,ic_dict)` tells the `Simulation` object to set the initial conditions of each cell referenced in `cell_id_list` to those given in the initial condition dictionary `ic_dict`. 
 
+Finally, simulating the system is a simple call:
 
+```Python
+import numpy as np
 
+t = np.linspace(0,20,1000)
+cell_data = sim.simulate(t)
+```
 
+`cell_data` is a list of species time evolution data for each cell. Specifically `cell_data[cell_id]` is a numpy array of dimension (len(t) x num_species) in which rows correspond to the state of each species in that cell's internal model at each time in `t`. Plotting this time evolution is easy:
 
+```Python
+import matplotlib.pyplot as plt
 
-
-
+plt.plot(t,cell_data[cell_id])
+plt.legend(['a','b','c'])
+plt.show()
+```
