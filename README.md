@@ -98,7 +98,7 @@ t = np.linspace(0,20,1000)
 cell_data = sim.simulate(t)
 ```
 
-`cell_data` is a list of species time evolution data for each cell. Specifically `cell_data[cell_id]` is a numpy array of dimension (len(t) x num_species) in which rows correspond to the state of each species in that cell's internal model at each time in `t`. Plotting this time evolution data is easy:
+`cell_data` is a list of species time evolution data for each cell. Specifically `cell_data[cell_id]` is a numpy array of dimension (len(t) x num_species) in which rows correspond to the state of each species in that cell's internal model at each time in `t` (1000 time points from 0.0 to 20.0). Plotting this time evolution data is easy:
 
 ```Python
 import matplotlib.pyplot as plt
@@ -107,6 +107,54 @@ plt.plot(t,cell_data[cell_id])
 plt.legend(['a','b','c'])
 plt.show()
 ```
+
+So far, we've just been simulating one cell. It is easy to simulate multiple cells with the same internal model and even multiple cells with different internal models:
+
+```Python
+
+# IM1 is the original oscillatory network
+IM1 = InternalModel()
+# first add the species in the network
+IM1.add_node('a','linear',[1.0]) # species 'a' decays linearly with constant factor 1.0
+IM1.add_node('b','linear',[1.0]) # species 'b' does as well
+IM1.add_node('c','linear',[10.0]) # species 'c' decays 10 times as fast as 'a' or 'b'
+
+
+a_prod = IM1.add_edge('a','a','const_prod',params=[5.0]) # 'a' is produced at a constant rate
+IM1.add_edge('a','b','hill_activ',params=[5.0,1.0,2]) # 'a' activates 'b'
+IM1.add_edge('b','c','hill_activ',params=[6.0,1.0,8]) # 'b' activates 'c' (with sharper cutoff)
+
+IM1.add_edge('c',a_prod,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.3,8])
+
+# IM2 is a network with only a single species
+IM2 = InternalModel()
+IM2.add_node('a','linear',[1.0])
+
+# we have 3 cells
+cell1 = Cell([0.0])
+cell2 = Cell([1.0])
+cell3 = Cell([2.0])
+
+sim = Simulation()
+# add the cells and internal models to simulation
+cell1_id = sim.add_cell(cell1)
+cell2_id = sim.add_cell(cell2)
+cell3_id = sim.add_cell(cell3)
+im1_id = sim.add_internal_model(IM1)
+im2_id = sim.add_internal_model(IM2)
+```
+
+Here, we create a second internal model that contains the single species 'a' with linear degradation. We also create 3 cells with single dimensional positions 0.0, 1.0, and 2.0, respectively. 
+
+Earlier it was mentioned that *external* interactions (between species of different cells) need to be specified with the `Simulation` object. As an example, we'll allow species 'a' to diffuse between cell2 and cell3:
+
+```Python
+# boolean array determines which cells interact
+connections = np.array([[False,False,False],[False,True,True],[False,True,True]])
+sim.add_interaction('a','a','diffusion',connections,params=[1.0])
+```
+
+
 
 
 
