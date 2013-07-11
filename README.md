@@ -67,6 +67,26 @@ The flag `mod_type` specifies how this new edge modifies the edge `a_prod`. By s
 In this particular case, the `a_prod` edge contribution to *d['a']/dt* is simply some constant *A*. The contribution of a `'hill_inactiv'` edge with `params=[D,C,A,n]` is *D - C ([from_node]/A)^n / ( 1 + ([from_node]/A)^n)*. Thus, the net contribution to *d['a']/dt* is *A(D - C (['c']/A)^n / ( 1 + (['c']/A)^n))*.
 
 
+Now we have an internal network specified which schematically looks like *a -> b -> c -| a*. All that's left to do is to make some cells, set some initial conditions and simulate using a `Simulation` object.
+
+Here we make a new `Cell` and `Simulation` object, and then add the `Cell` and `InternalModel` we previously created to the `Simulation` object:
+
+```Python
+cell = Cell()                      # new cell with no position specified
+sim = Simulation()                 # new Simulation object to organize everything
+cell_id = sim.add_cell(cell)       # add the cell to the simulation framework
+im_id = sim.add_internal_model(IM) # add the internal model to the simulation framework
+```
+
+If we wanted to make a cell with a position (perhaps for diffusion), we would have simply needed to fill in the `position` argument in the call `Cell(position=None)`. We need to add each cell and each internal model we want to simulate to the `Simulation` object; the calls `sim.add_cell(...)` and `sim.add_internal_model(...)` both return corresponding integer id's for identification. 
+
+After adding the cells and internal models to the `Simulation` object, we need to specify which cells are governed by which internal models and also set the cells initial conditions:
+
+```Python
+sim.set_internal_model([cell_id],im_id)
+sim.set_initial_conditions([cell_id],{'a':0.1,'b':0.0,'c':0.0})
+```
+
 
 
 
