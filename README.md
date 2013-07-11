@@ -154,7 +154,9 @@ connections = np.array([[False,False,False],[False,True,True],[False,True,True]]
 sim.add_interaction('a','a','diffusion',connections,params=[1.0])
 ```
 
-
+Analogous to how *internal* interactions were added in an `InternalModel` object, *external* interactions are added in a `Simulation` object with a call to `sim.add_interaction(from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None)`. The arguments and flags `from_node`, `to`, `type`, `is_mod`, `mod_type`, and `params` are exactly analogous to those from `IM.add_edge(...)`. The only additional arguments are:
+ - connections - (num\_cells x num\_cells) boolean array specifying which cells 
+ - IM_id
 
 
 
