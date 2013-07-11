@@ -98,7 +98,7 @@ t = np.linspace(0,20,1000)
 cell_data = sim.simulate(t)
 ```
 
-`cell_data` is a list of species time evolution data for each cell. Specifically `cell_data[cell_id]` is a numpy array of dimension (len(t) x num_species) in which rows correspond to the state of each species in that cell's internal model at each time in `t`. Plotting this time evolution is easy:
+`cell_data` is a list of species time evolution data for each cell. Specifically `cell_data[cell_id]` is a numpy array of dimension (len(t) x num_species) in which rows correspond to the state of each species in that cell's internal model at each time in `t`. Plotting this time evolution data is easy:
 
 ```Python
 import matplotlib.pyplot as plt
@@ -107,3 +107,6 @@ plt.plot(t,cell_data[cell_id])
 plt.legend(['a','b','c'])
 plt.show()
 ```
+
+
+
