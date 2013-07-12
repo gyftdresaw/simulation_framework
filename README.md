@@ -3,11 +3,6 @@ simulation_framework
 
 This is a Python framework for doing gene network type simulations. After the user specifies what species and species-species interactions exist in what cells, this framework will sort out evaluating and simulating the corresponding differential equations using numpy/scipy.
 
-dependencies
-------------
-
-
-
 walk through
 ============
 
@@ -155,8 +150,60 @@ sim.add_interaction('a','a','diffusion',connections,params=[1.0])
 ```
 
 Analogous to how *internal* interactions were added in an `InternalModel` object, *external* interactions are added in a `Simulation` object with a call to `sim.add_interaction(from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None)`. The arguments and flags `from_node`, `to`, `type`, `is_mod`, `mod_type`, and `params` are exactly analogous to those from `IM.add_edge(...)`. The only additional arguments are:
- - connections - (num\_cells x num\_cells) boolean array specifying which cells 
- - IM_id
+ - connections - (num\_cells x num\_cells) boolean array specifying which cells interact with which. Specifically, for row i and column j, if connections[i,j] is marked True, we are indicating that the *['from_node']* level of cell j contributes to the *d['to']/dt* of cell i (assuming `to` is a node; if it is an edge, then this contribution affects the edge's corresponding contribution). 
+ 
+   In our example, we see that the diffusive contribution to *d['a']/dt* in cell2 is calculated from the *['a']* levels in cells 2 and 3. Likewise, the diffusive contribution to *d['a']/dt* in cell3 is calculated from the *['a']* levels in cells 2 and 3. Generally, it is up to the interaction class referenced by the call to `IM.add_edge(...)` to take the input from the appropriate cells and calculate the appropriate contribution. 
+ - IM_id - if the external interactions affects an edge rather than a node (and so is a *modification*), then we need to specify for which internal model does the edge id provided in the argument `to` refer to. 
 
+All that's left to do is to set the initial conditions for each cell and simulate:
 
+```Python
+# cell1 and cell2 start with the same initial conditions
+sim.set_initial_conditions([cell1_id,cell2_id],{'a':0.1,'b':0.0,'c':0.0})
+sim.set_initial_conditions([cell3_id],{'a':0}) # cell3 starts with 0 'a'
 
+t = np.linspace(0,20,1000)
+cell_data = sim.simulate(t) # cell_data is a list of 3 numpy arrays containing cell specific data
+```
+
+We can plot the levels of all species in each cell with something like:
+
+```Python
+import matplotlib.pyplot as plt
+
+plt.figure()
+plt.subplot(311)
+plt.plot(t,cell_data[cell1_id])
+plt.title('cell1')
+plt.legend(['a','b','c'])
+
+plt.subplot(312)
+plt.plot(t,cell_data[cell2_id])
+plt.title('cell2')
+plt.legend(['a','b','c'])
+
+plt.subplot(313)
+plt.plot(t,cell_data[cell3_id])
+plt.title('cell3')
+plt.legend(['a'])
+plt.xlabel('time')
+
+plt.tight_layout()
+plt.show()
+```
+
+and see oscillations in all 3 cells! We even see how letting 'a' diffuse between cells 2 and 3 appears to change the oscillation frequency. 
+
+![feedback example](/feedback_example.png)
+
+Once again, full source code for this example can be found in negative_feedback.py
+
+dependencies
+------------
+
+This framework was written with Python 2.7.3, numpy 1.6.1, and scipy 0.10.1
+
+creating new interactions
+-------------------------
+
+TODO
