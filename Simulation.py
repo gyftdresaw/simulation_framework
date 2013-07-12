@@ -228,7 +228,8 @@ class InternalModel:
 
     def set_primary_node(self,name):
         return
-
+    
+    # TODO: this would probably be useful
     def print_model(self):
         return 
 
