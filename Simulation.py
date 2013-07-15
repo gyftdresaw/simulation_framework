@@ -2,134 +2,45 @@
 # Framework for cell-network simulations using scipy/numpy
 import numpy as np
 from scipy.integrate import odeint
-import scipy.spatial.distance as dist
+import interactions.internal as intern
+import interactions.external as extern
+
+# need time scale
+class Node:
+    def __init__(self,name):
+        self.name = name
+        self.degrades = False # no degradation by default
+        self.degradation = None
+        self.diffuses = False # since diffusion involves multiple cells
+        self.diffusion = None # it should be set with cell-cell interactions
+        self.is_primary = False # primary false by default
+
+    def set_degradation(self,degradation):
+        self.degrades = not degradation is None
+        self.degradation = degradation
+        return self.degradation            
+
+    def set_as_primary(self):
+        self.is_primary = True
+
+class Edge:
+    def __init__(self,from_node,to,model,edge_id):
+        self.from_node = from_node
+        # edge can either point node -> node
+        # or node -> edge (is_mod = True)
+        if model.is_mod:
+            self.to_node = None
+            self.to_edge = to
+        else:
+            self.to_node = to
+            self.to_edge = None
+        self.is_mod = model.is_mod
+        self.mod_type = model.mod_type # 'intern' or 'mult'
+        self.model = model # model contains info relevant to interaction
+        self.edge_id = edge_id # simple but not the greatest way to identify edges
+        self.external = False
 
 class InternalModel:
-    # need constant prefactors
-    class ConstantProduction:
-        def __init__(self,params=None):
-            self.num_params = 1 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = False
-            self.mod_type = None
-            if not params is None:
-                self.set_params(params)
-        def set_params(self,params):
-            self.C = params[0]
-            self.params_set = True
-        def apply(self,x):
-            return self.C * np.ones(len(x))
-    class LinearActivation:
-        def __init__(self,is_mod=False,mod_type=None,params=None):
-            self.num_params = 1 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = is_mod
-            self.mod_type = mod_type
-            if not params is None:
-                self.set_params(params)
-        def set_params(self,params):
-            self.C = params[0]
-            self.params_set = True
-        def apply(self,x):
-            return self.C * x
-    class HillActivation:
-        def __init__(self,is_mod=False,mod_type=None,params=None):
-            self.num_params = 3 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = is_mod
-            self.mod_type = mod_type
-            if not params is None:
-                self.set_params(params)
-        # C (x/A)^n / (1 + (x/A)^n)
-        # params order: [C A n]
-        def set_params(self,params):
-            self.C = params[0]
-            self.A = params[1]
-            self.n = params[2]
-            self.params_set = True
-        def apply(self,x):
-            return ( self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) )
-    class HillInactivation:
-        def __init__(self,is_mod=False,mod_type=None,params=None):
-            self.num_params = 4 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = is_mod
-            self.mod_type = mod_type
-            if not params is None:
-                self.set_params(params)
-        # D - ( C (x/A)^n / (1 + (x/A)^n) )
-        # params order: [D C A n]
-        def set_params(self,params):
-            self.D = params[0]
-            self.C = params[1]
-            self.A = params[2]
-            self.n = params[3]
-            self.params_set = True
-        def apply(self,x):
-            return (self.D - (self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) ))
-    # degradation classes
-    class LinearDegradation:
-        def __init__(self,params=None):
-            self.num_params = 1 # includes constant prefactors
-            self.params_set = False
-            self.is_mod = False
-            self.mod_type = None
-            if not params is None:
-                self.set_params(params)
-        def set_params(self,params):
-            self.C = params[0]
-            self.params_set = True
-        # apply assumes given a numpy array
-        def apply(self,x):
-            return self.C * (-x)
-    class ParabolicDegradation:
-        def __init__(self,params=None):
-            self.num_params = 1 # includes constant prefactors
-            self.params_set = False
-            self.is_mod = False
-            self.mod_type = None
-            if not params is None:
-                self.set_params(params)
-        def set_params(self,params):
-            self.C = params[0]
-            self.params_set = True
-        def apply(self,x):
-            return self.C * (-(x**2))
-    # need time scale
-    class Node:
-        def __init__(self,name):
-            self.name = name
-            self.degrades = False # no degradation by default
-            self.degradation = None
-            self.diffuses = False # since diffusion involves multiple cells
-            self.diffusion = None # it should be set with cell-cell interactions
-            self.is_primary = False # primary false by default
-
-        def set_degradation(self,degradation):
-            self.degrades = not degradation is None
-            self.degradation = degradation
-            return self.degradation            
-
-        def set_as_primary(self):
-            self.is_primary = True
-    
-    class Edge:
-        def __init__(self,from_node,to,model,edge_id):
-            self.from_node = from_node
-            # edge can either point node -> node
-            # or node -> edge (is_mod = True)
-            if model.is_mod:
-                self.to_node = None
-                self.to_edge = to
-            else:
-                self.to_node = to
-                self.to_edge = None
-            self.is_mod = model.is_mod
-            self.mod_type = model.mod_type # 'intern' or 'mult'
-            self.model = model # model contains info relevant to interaction
-            self.edge_id = edge_id # simple but not the greatest way to identify edges
-            self.external = False
-
     def __init__(self):
         self.nodes = [] # list of species nodes
         self.edges = [] # list of edges
@@ -146,25 +57,18 @@ class InternalModel:
     def set_node_degradation(self,name,degradation,params=None):
         # get node
         node = self.get_node(name)
-        if degradation == 'linear':
-            deg_model = self.LinearDegradation(params)
-        elif degradation == 'parabolic':
-            deg_model = self.ParabolicDegradation(params)
-        elif degradation is None:
-            # return before making a new edge and everything
-            node.set_degradation(None)
-            return
+        deg_model = intern.get_edge_model(degradation,params=params)
         node.set_degradation(deg_model)
 
         # also add degradation as an edge
         eid = self.edge_counter
         self.edge_counter += 1
-        new_edge = self.Edge(name,name,deg_model,eid)
+        new_edge = Edge(name,name,deg_model,eid)
         self.edges.append(new_edge)
         return self.get_edge(eid)        
 
     def add_node(self,name,degradation=None,params=None):
-        new_node = self.Node(name)
+        new_node = Node(name)
         # add node to list to keep track of it
         self.nodes.append(new_node)
         self.node_names[name] = len(self.nodes) - 1 # set name in name dict
@@ -180,24 +84,11 @@ class InternalModel:
         # take first element of match
         return ([e for e in self.edges if e.edge_id == edge_id])[0]
 
-    # deal with getting the right edge
-    def get_edge_model(self,type,is_mod=False,mod_type=None,params=None):
-        if type == 'const_prod':
-            return self.ConstantProduction(params)
-        elif type == 'lin_activ':
-            return self.LinearActivation(is_mod,mod_type,params)
-        elif type == 'hill_activ':
-            return self.HillActivation(is_mod,mod_type,params)
-        elif type == 'hill_inactiv':
-            return self.HillInactivation(is_mod,mod_type,params)
-        else:
-            return None
-
     def add_edge(self,from_node,to,type,is_mod=False,mod_type=None,params=None):
         eid = self.edge_counter
         self.edge_counter += 1
-        new_model = self.get_edge_model(type,is_mod,mod_type,params)
-        new_edge = self.Edge(from_node,to,new_model,eid)
+        new_model = intern.get_edge_model(type,is_mod,mod_type,params)
+        new_edge = Edge(from_node,to,new_model,eid)
         self.edges.append(new_edge)
         return eid
 
@@ -274,89 +165,31 @@ class Cell:
         for i in xrange(len(IC)):
             self.IC[i] = IC[self.IM.nodes[i].name]
         return 
+
+# wrapper for interactions
+class Interaction:
+    # IM_id only relevant if interaction is a mod of an internal edge
+    def __init__(self,from_node,to,model,int_id,IM_id=None):
+        self.external = True
+        self.from_node = from_node
+        # either (node -> node) (is_mod is False)
+        # or (node -> edge) -- where edge can be internal or external
+        if model.is_mod:
+            self.to_node = None
+            self.to_edge = to
+            self.to_IM = IM_id # if IM_id is None, then refers to interaction
+        else:
+            self.to_node = to
+            self.to_edge = None
+            self.to_IM = None
+
+        self.is_mod = model.is_mod
+        self.mod_type = model.mod_type # 'intern' or 'mult'
+
+        self.model = model
+        self.int_id = int_id
     
-
 class Simulation:
-    # interaction classes
-    class Diffusion:
-        # connections is a (total_cells x total_cells) boolean matrix 
-        # defining which cells interact
-        # True for interaction
-        def __init__(self,connections,cells,params=None):
-            self.external = True
-            self.num_params = 1 # includes constant prefactor
-            self.params_set = False
-            self.is_mod = False
-            self.mod_type = None
-            if not params is None:
-                self.set_params(params)
-            # precalculate distance prefactors
-            self.dist_pre = None # (total_cells x total_cells)
-            self.set_dist_pre(cells)
-            self.cmask = ~connections # in mask, True removes the entry
-        def set_dist_pre(self,cells):
-            # should maybe check that all cells have a position set
-            # we're going to use scipy distance helpers
-            # imported as dist
-            pos = np.array([c.position for c in cells])
-
-            # square euclidean distance
-            cond_dist = dist.pdist(pos,'sqeuclidean')
-            distances = dist.squareform(cond_dist)
-
-            # mask so inversion doesn't break anything
-            dmask = (distances == 0.0) # so we don't get that annoying divide by zero
-            masked_dists = np.ma.array(distances,mask = dmask,fill_value=0)
-            invert_dists = np.ma.divide(1.0,masked_dists)
-            self.dist_pre = invert_dists.filled()
-            return
-        def set_params(self,params):
-            self.C = params[0]
-            self.params_set = True
-        # x is an (im_num_cells x total_cells) input matrix
-        # im_bounds is a tuple which says which cells this IM corresponds to
-        def apply(self,x,im_bounds):
-            lower,upper = im_bounds
-            # need to extract levels inside cells
-            inner_levels = np.diag(x[:,lower:upper])
-            
-            # this is kind of a hack
-            # should subtract each column elementwise by inner_levels
-            level_diff = np.subtract(np.transpose(x),inner_levels).transpose()
-            
-            # multiply through by distance prefactors and constant
-            diff_contribs = self.C * self.dist_pre[lower:upper,:] * level_diff
-            # apply connection mask
-            cmask_slice = self.cmask[lower:upper,:]
-            masked_contribs = np.ma.array(diff_contribs,mask=cmask_slice,fill_value=0)
-
-            # finally just sum along the rows
-            # filling in 0 for masked entries
-            return np.sum(masked_contribs.filled(),axis=1)
-
-    # wrapper for interactions
-    class Interaction:
-        # IM_id only relevant if interaction is a mod of an internal edge
-        def __init__(self,from_node,to,model,int_id,IM_id=None):
-            self.external = True
-            self.from_node = from_node
-            # either (node -> node) (is_mod is False)
-            # or (node -> edge) -- where edge can be internal or external
-            if model.is_mod:
-                self.to_node = None
-                self.to_edge = to
-                self.to_IM = IM_id # if IM_id is None, then refers to interaction
-            else:
-                self.to_node = to
-                self.to_edge = None
-                self.to_IM = None
-
-            self.is_mod = model.is_mod
-            self.mod_type = model.mod_type # 'intern' or 'mult'
-
-            self.model = model
-            self.int_id = int_id
-
     def __init__(self):
         self.cells = [] # cell list
         self.IMs = [] # list of internal models for cells
@@ -397,18 +230,12 @@ class Simulation:
     # will do with internal nodes for now
     # def set_prefactors(self,IM):
     #     return
-
-    def get_int_model(self,type,connections,is_mod=False,mod_type=None,params=None):
-        if type == 'diffusion':
-            return self.Diffusion(connections,self.cells,params)
-        else:
-            return None
               
     def add_interaction(self,from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None):
         int_id = self.int_counter
         self.int_counter += 1
-        new_model = self.get_int_model(type,connections,is_mod,mod_type,params)
-        new_interaction = self.Interaction(from_node,to,new_model,int_id,IM_id)
+        new_model = extern.get_int_model(type,connections,self.cells,is_mod,mod_type,params)
+        new_interaction = Interaction(from_node,to,new_model,int_id,IM_id)
         self.interactions.append(new_interaction)
         return int_id
 
