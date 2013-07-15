@@ -20,10 +20,15 @@ IM.add_node('a','linear',params=[1.0])
 IM.add_node('s','linear',params=[1.0/Ts])
 IM.add_node('h','linear',params=[1.0/Th])
 IM.add_node('u','linear',params=[1.0/Tu])
+# additional yan business
+IM.add_node('yan','linear',params=[1.0])
+IM.add_node('pnt','linear',params=[1.0])
+IM.add_node('notch','linear',params=[1.0])
 
 # internal interactions
+# lubensky
 # a -> a
-IM.add_edge('a','a','hill_activ',params=[1.0,Aa,na])
+aa_edge = IM.add_edge('a','a','hill_activ',params=[1.0,Aa,na])
 
 # a -> s, s -> a
 IM.add_edge('a','s','hill_activ',params=[1.0/Ts,As,ns])
@@ -40,11 +45,24 @@ ha_edge = IM.add_edge('h','a','hill_activ',params=[G,H,mh])
 # u -| (h -> a)
 IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,U,mu])
 
+# yan business interactions
+# yan-pnt bistable switch:
+#  yan -| pnt
+#  pnt -| yan
+IM.add_edge('yan','pnt','hill_inactiv',params=[1.0,1.0,1.0,4])
+IM.add_edge('pnt','yan','hill_inactiv',params=[1.0,1.0,1.0,4])
+
+# notch -> yan
+IM.add_edge('notch','yan','hill_activ',params=[1.0,1.0,2])
+
+# not sure best way to inhibit a, inhibiting self production seems reasonable
+# notch -| (a -> a)
+IM.add_edge('notch',aa_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,4])
 
 # need to make some cells 
 # the 1d case is easy:
 # in our 'lattice', all the cells are distance 1 apart
-NCells = 50
+NCells = 30
 cells = [Cell([x]) for x in np.linspace(1,NCells,NCells)]
 
 # add these cells to the simulation
@@ -58,21 +76,31 @@ im_id = sim.add_internal_model(IM)
 sim.set_internal_model(range(NCells),im_id)
 
 # cells adjacent to one another are connected
+# for diffusion we include main diagonal
 # equivalent to 3 wide diagonal
-connections = (np.eye(NCells,k=-1) + np.eye(NCells,k=0) + np.eye(NCells,k=1)) > 0
+diff_connections = (np.eye(NCells,k=-1) + np.eye(NCells,k=0) + np.eye(NCells,k=1)) > 0
 
 # add diffusion to h and u
-sim.add_interaction('h','h','diffusion',connections,params=[Dh/Th])
-sim.add_interaction('u','u','diffusion',connections,params=[Du/Tu])
+sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
+sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
+
+# cells adjacent to one another are connected
+# for activation, don't inlude main diagonal
+hill_connections = (np.eye(NCells,k=-1) + np.eye(NCells,k=1)) > 0
+
+# a -> pnt
+sim.add_interaction('a','pnt','hill_activ',hill_connections,params=[1.0,1.0,2.0])
+# a -> notch
+sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.0,1.0,2.0])
 
 # start with only first cell up
-low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0}
+low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'notch':0.0,'yan':1.0,'pnt':0.0}
+high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'notch':0.0,'yan':1.0,'pnt':0.0}
 sim.set_initial_conditions(range(1,NCells),low_dict)
 sim.set_initial_conditions([0],high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,300,500)
+t = np.linspace(0,150,500)
 cdata = sim.simulate(t)
 print 'simulation done'
 
@@ -98,7 +126,7 @@ def plot_species(species_name,times,x_coord,t):
     '''
     # plot along x axis
     plt.figure()
-    colors = cm.rainbow(np.linspace(0, 1, len(tindices)))
+    colors = cm.Dark2(np.linspace(0, 1, len(tindices)))
     for j in xrange(len(tindices)):
         plt.scatter(x_coord,astatus[:,j],color=colors[j])
     plt.legend(times)

@@ -60,11 +60,49 @@ class Diffusion:
         # filling in 0 for masked entries
         return np.sum(masked_contribs.filled(),axis=1)
 
+# cell-cell activation
+class HillActivation:
+    # connections is a (total_cells x total_cells) boolean matrix 
+    # defining which cells interact
+    # True for interaction
+    # for now doesn't use cell properties
+    def __init__(self,connections,is_mod=False,mod_type=None,params=None):
+        self.external = True
+        self.num_params = 1 # includes constant prefactor
+        self.params_set = False
+        self.is_mod = is_mod
+        self.mod_type = mod_type
+        if not params is None:
+            self.set_params(params)
+        self.cmask = ~connections # in mask, True removes the entry
+    # C (x/A)^n / (1 + (x/A)^n)
+    # params order: [C A n]
+    def set_params(self,params):
+        self.C = params[0]
+        self.A = params[1]
+        self.n = params[2]
+        self.params_set = True
+    # x is an (im_num_cells x total_cells) input matrix
+    # im_bounds is a tuple which says which cells this IM corresponds to
+    def apply(self,x,im_bounds):
+        lower,upper = im_bounds
+
+        # calculate contributions
+        hill_contribs = ( self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) )
+        # apply connection mask
+        cmask_slice = self.cmask[lower:upper,:]
+        masked_contribs = np.ma.array(hill_contribs,mask=cmask_slice,fill_value=0)
+
+        # finally just sum along the rows
+        # filling in 0 for masked entries
+        return np.sum(masked_contribs.filled(),axis=1)
 
 
 # deal with getting the right interaction model
 def get_int_model(type,connections,cells,is_mod=False,mod_type=None,params=None):
     if type == 'diffusion':
         return Diffusion(connections,cells,params)
+    elif type == 'hill_activ':
+        return HillActivation(connections,is_mod,mod_type,params)
     else:
         return None
