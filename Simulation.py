@@ -120,6 +120,10 @@ class InternalModel:
     def set_primary_node(self,name):
         return
     
+    # return list of node names in id order
+    def get_node_names(self):
+        return [n.name for n in self.nodes]
+    
     # TODO: this would probably be useful
     def print_model(self):
         return 

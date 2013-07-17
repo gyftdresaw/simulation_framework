@@ -12,18 +12,20 @@ Dh,Du = 200.0,0.16
 S,H,U = 0.57,0.0088,4e-6
 G,F = 0.8,0.6
 
+# new stuff
+Ty,Tp = 1.0,1.0
+
 # all cells have the same internal model
 # 
-# 4 species: 
+# 6 species: 
 IM = InternalModel()
 IM.add_node('a','linear',params=[1.0])
 IM.add_node('s','linear',params=[1.0/Ts])
 IM.add_node('h','linear',params=[1.0/Th])
 IM.add_node('u','linear',params=[1.0/Tu])
 # additional yan business
-IM.add_node('yan','linear',params=[1.0])
-IM.add_node('pnt','linear',params=[1.0])
-IM.add_node('notch','linear',params=[1.0])
+IM.add_node('y','linear',params=[1.0/Ty])
+IM.add_node('p','linear',params=[1.0/Tp])
 
 # internal interactions
 # lubensky
@@ -38,26 +40,34 @@ IM.add_edge('s','a','hill_activ',params=[F,S,ms])
 IM.add_edge('a','u','hill_activ',params=[1.0/Tu,Au,nu])
 
 # a -> h
-IM.add_edge('a','h','hill_activ',params=[1.0/Th,Ah,nh])
+# no a -> h edge
+# IM.add_edge('a','h','hill_activ',params=[1.0/Th,Ah,nh])
 # h -> a
 ha_edge = IM.add_edge('h','a','hill_activ',params=[G,H,mh])
 
 # u -| (h -> a)
 IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,U,mu])
 
+# new edges
+# a -> p
+ap_edge = IM.add_edge('a','p','hill_activ',params=[1.0/Tp,0.5,4])
+# p -> h
+IM.add_edge('p','h','hill_activ',params=[1.0/Th,1.0,8])
+
+# u -> y
+uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
+
+# completely speculative
+IM.add_edge('h','p','hill_activ',params=[1.0/Tp,0.05,2])
+
 # yan business interactions
 # yan-pnt bistable switch:
-#  yan -| pnt
+#  yan -| pnt --> not yet
 #  pnt -| yan
-IM.add_edge('yan','pnt','hill_inactiv',params=[1.0,1.0,1.0,4])
-IM.add_edge('pnt','yan','hill_inactiv',params=[1.0,1.0,1.0,4])
+# IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
+IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.8,6])
 
-# notch -> yan
-IM.add_edge('notch','yan','hill_activ',params=[1.0,1.0,2])
 
-# not sure best way to inhibit a, inhibiting self production seems reasonable
-# notch -| (a -> a)
-IM.add_edge('notch',aa_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,4])
 
 # need to make some cells 
 # the 1d case is easy:
@@ -84,18 +94,20 @@ diff_connections = (np.eye(NCells,k=-1) + np.eye(NCells,k=0) + np.eye(NCells,k=1
 sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
+'''
+# no just lateral connections
 # cells adjacent to one another are connected
 # for activation, don't inlude main diagonal
 hill_connections = (np.eye(NCells,k=-1) + np.eye(NCells,k=1)) > 0
 
 # a -> pnt
-sim.add_interaction('a','pnt','hill_activ',hill_connections,params=[1.0,1.0,2.0])
+sim.add_interaction('a','pnt','hill_activ',hill_connections,params=[1.0,1.5,4])
 # a -> notch
-sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.0,1.0,2.0])
-
+sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.5,0.5,2])
+'''
 # start with only first cell up
-low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'notch':0.0,'yan':1.0,'pnt':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'notch':0.0,'yan':1.0,'pnt':0.0}
+low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0}
+high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0}
 sim.set_initial_conditions(range(1,NCells),low_dict)
 sim.set_initial_conditions([0],high_dict)
 
@@ -113,7 +125,6 @@ x_coord = np.linspace(1,NCells,NCells)
 # plot species at various times
 def plot_species(species_name,times,x_coord,t):
     tindices = [np.abs(t-v).argmin() for v in times]
-    print tindices
     astatus = np.zeros((NCells,len(tindices)))
     for i in xrange(NCells):
         for j in xrange(len(tindices)):
@@ -129,8 +140,15 @@ def plot_species(species_name,times,x_coord,t):
     colors = cm.Dark2(np.linspace(0, 1, len(tindices)))
     for j in xrange(len(tindices)):
         plt.scatter(x_coord,astatus[:,j],color=colors[j])
-    plt.legend(times)
+    plt.legend(['%.1f'% t for t in times],loc='best')
     plt.title(species_name)
     plt.show()
 
-plot_species('a',np.linspace(100,115,3),x_coord,t)
+plot_species('a',np.linspace(0.0,150,8),x_coord,t)
+
+def plot_cell(cid,(times),t):
+    tstart,tend = [np.abs(t-v).argmin() for v in times]
+    plt.figure()
+    plt.plot(t[tstart:tend],cdata[cid][tstart:tend,:])
+    plt.legend(IM.get_node_names())
+    plt.show()
