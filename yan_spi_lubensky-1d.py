@@ -70,7 +70,7 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
 #  yan -| pnt --> not yet
 #  pnt -| yan
 # IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.4,2])
+IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,4])
 
 
 
@@ -100,7 +100,7 @@ sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
 # spi diffusion
-sim.add_interaction('sp','sp','diffusion',diff_connections,params=[0.1/Tsp])
+sim.add_interaction('sp','sp','diffusion',diff_connections,params=[5.0/Tsp])
 
 '''
 # no just lateral connections
