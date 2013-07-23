@@ -1,4 +1,7 @@
 
+# Mac
+.DS_store
+
 *.py[cod]
 
 # C extensions

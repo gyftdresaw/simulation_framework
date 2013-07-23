@@ -53,24 +53,27 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # replace a -> p
 # ap_edge = IM.add_edge('a','p','hill_activ',params=[1.0/Tp,0.5,4])
 # with a -> sp
-IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
+IM.add_edge('a','sp','hill_activ',params=[4.0/Tsp,0.6,8])
+
 # and sp -> p
-spp_edge = IM.add_edge('sp','p','hill_activ',params=[6.0/Tp,0.5,1])
+IM.add_edge('sp','p','hill_activ',params=[6.0/Tp,1.0,1])
+
 # p -> h
-IM.add_edge('p','h','hill_activ',params=[1.0/Th,1.0,8])
+IM.add_edge('p','h','hill_activ',params=[0.5/Th,1.0,8])
 
 # u -> y
 uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
 
 # completely speculative
-# IM.add_edge('h','p','hill_activ',params=[1.0/Tp,0.05,2])
+IM.add_edge('h','sp','hill_activ',params=[2.0/Tsp,0.08,2])
 
 # yan business interactions
 # yan-pnt bistable switch:
 #  yan -| pnt --> not yet
 #  pnt -| yan
 # IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.1,7])
+IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,2.0,5])
+
 
 
 
@@ -100,7 +103,7 @@ sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
 # spi diffusion
-sim.add_interaction('sp','sp','diffusion',diff_connections,params=[5.0/Tsp])
+sim.add_interaction('sp','sp','diffusion',diff_connections,params=[0.5/Tsp])
 
 '''
 # no just lateral connections

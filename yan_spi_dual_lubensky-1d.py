@@ -54,8 +54,12 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # ap_edge = IM.add_edge('a','p','hill_activ',params=[1.0/Tp,0.5,4])
 # with a -> sp
 IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
+
 # and sp -> p
-spp_edge = IM.add_edge('sp','p','hill_activ',params=[6.0/Tp,0.5,1])
+# two edges allows for a better graded response
+IM.add_edge('sp','p','hill_activ',params=[12.0/Tp,0.17,10])
+IM.add_edge('sp','p','lin_activ',params=[8.0/Tp])
+
 # p -> h
 IM.add_edge('p','h','hill_activ',params=[1.0/Th,1.0,8])
 
@@ -70,7 +74,8 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
 #  yan -| pnt --> not yet
 #  pnt -| yan
 # IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.1,7])
+IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
+
 
 
 

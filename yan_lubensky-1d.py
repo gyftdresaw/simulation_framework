@@ -65,7 +65,7 @@ IM.add_edge('h','p','hill_activ',params=[1.0/Tp,0.05,2])
 #  yan -| pnt --> not yet
 #  pnt -| yan
 # IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.8,6])
+IM.add_edge('p',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.7,6])
 
 
 
