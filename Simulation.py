@@ -4,6 +4,7 @@ import numpy as np
 from scipy.integrate import odeint
 import interactions.internal as intern
 import interactions.external as extern
+import interactions.modulators as moduls
 
 # need time scale
 class Node:
@@ -77,6 +78,7 @@ class InternalModel:
         # call helper
         self.set_node_degradation(name,degradation,params)
         
+
         return self.get_node(name)
 
     def get_edge(self,edge_id):
@@ -192,6 +194,13 @@ class Interaction:
 
         self.model = model
         self.int_id = int_id
+
+class Modulator:
+    # IM_id only relevant if modulator of an internal edge
+    def __init__(self,to_edge,model,IM_id=None):
+        self.to_edge = to_edge
+        self.to_IM = IM_id # if IM_id is None, then modulating an external interaction
+        self.model = model
     
 class Simulation:
     def __init__(self):
@@ -201,6 +210,7 @@ class Simulation:
         self.IM_bounds = [] # list of tuples denoting cell bounds
         self.interactions = [] # list of cell-cell interactions
         self.int_counter = 0 # for generating int_id's
+        self.modulators = [] # list of time-dependent modulators
         
     def add_cell(self,cell):
         self.cells.append(cell)
@@ -242,6 +252,12 @@ class Simulation:
         new_interaction = Interaction(from_node,to,new_model,int_id,IM_id)
         self.interactions.append(new_interaction)
         return int_id
+
+    def add_modulator(self,to,type,IM_id=None,**kwargs):
+        new_model = moduls.get_mod_model(type,self.cells,**kwargs)
+        new_modulator = Modulator(to,new_model,IM_id)
+        self.modulators.append(new_modulator)
+        return
 
     def num_cells(self):
         return len(self.cells)
@@ -288,11 +304,16 @@ class Simulation:
     # if IM_id is given, then we're looking for modifiers to an internal edge
     # if not, then we're looking for modifiers to an external edge
     def get_modifiers(self,to_edge,IM_id = None):
-        return [i for i in self.interactions if i.to_edge==to_edge and i.IM_id==IM_id]
+        return [i for i in self.interactions if i.to_edge==to_edge and i.to_IM==IM_id]
+
+    # if IM_id is given, then we're looking for modulators to an internal edge
+    # if not, then we're looking fro modulators to an external edge
+    def get_modulators(self,to_edge,IM_id = None):
+        return [m for m in self.modulators if m.to_edge==to_edge and m.to_IM==IM_id]
 
     # recursively resolve the contribution 
     # IM_id is relevant, tells us for which cells we're calculating for 
-    def resolve_contribution(self,contrib,ycurrent,IM_id):
+    def resolve_contribution(self,contrib,ycurrent,IM_id,t):
 
         # contrib is either an internal or external edge
         # applying them will require different data depending
@@ -322,7 +343,7 @@ class Simulation:
             for mod in ext_mods:
                 if mod.mod_type == 'intern':
                     # multiply rows of xcontrib through by mod_contrib
-                    mod_contrib = resolve_contribution(mod,ycurrent,IM_id)
+                    mod_contrib = resolve_contribution(mod,ycurrent,IM_id,t)
                     xcontrib = np.dot(np.diag(mod_contrib),xcontrib)
 
             # apply xcontrib, then multiply by multiplicative mods
@@ -330,8 +351,12 @@ class Simulation:
             ycontrib = contrib.model.apply(xcontrib,self.IM_bounds[IM_id])
             for mod in ext_mods:
                 if mod.mod_type == 'mult':
-                    ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id)
+                    ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id,t)
 
+            # check for any modulators (time dependent mods)
+            modulates = self.get_modulators(contrib.edge_id) # no IM_id needed
+            for modulate in modulates:
+                ycontrib *= modulate.model.apply(self.IM_cells[IM_id],t)
             return ycontrib
         else:
             # need to check for internal and external modifiers
@@ -348,16 +373,20 @@ class Simulation:
             # first do mods to xcontrib
             for mod in (int_mods + ext_mods):
                 if mod.mod_type == 'intern':
-                    xcontrib *= self.resolve_contribution(mod,ycurrent,IM_id)
+                    xcontrib *= self.resolve_contribution(mod,ycurrent,IM_id,t)
                     
             # apply xcontrib, then multiply by multiplicative mods
             ycontrib = contrib.model.apply(xcontrib)
             for mod in (int_mods + ext_mods):
                 if mod.mod_type == 'mult':
-                    ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id)
+                    ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id,t)
 
             # print from_node,IM_id,contrib.edge_id,ycontrib,ycurrent
-                    
+            
+            # check for any modulators (time dependent mods)
+            modulates = self.get_modulators(contrib.edge_id,IM_id)
+            for modulate in modulates:
+                ycontrib *= modulate.model.apply(self.IM_cells[IM_id],t)
             return ycontrib
 
 
@@ -403,7 +432,7 @@ class Simulation:
                 # add up all contributions
                 # resolve contribution will deal with modifier business
                 for contrib in (int_contributions + ext_contributions):
-                    yprime[i][:,j] += self.resolve_contribution(contrib,ycurrent,i)
+                    yprime[i][:,j] += self.resolve_contribution(contrib,ycurrent,i,t)
                     # print yprime[i][:,j],i,j,ycurrent[i][:,j]
 
         # print 'done calculating derivative'

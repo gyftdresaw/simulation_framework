@@ -35,6 +35,7 @@ sim = Simulation()
 cell1_id = sim.add_cell(cell1)
 cell2_id = sim.add_cell(cell2)
 cell3_id = sim.add_cell(cell3)
+
 im1_id = sim.add_internal_model(IM1)
 im2_id = sim.add_internal_model(IM2)
 
