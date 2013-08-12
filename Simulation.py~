@@ -354,7 +354,7 @@ class Simulation:
                     ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id,t)
 
             # check for any modulators (time dependent mods)
-            modulates = self.get_modulators(contrib.int_id) # no IM_id needed
+            modulates = self.get_modulators(contrib.edge_id) # no IM_id needed
             for modulate in modulates:
                 ycontrib *= modulate.model.apply(self.IM_cells[IM_id],t)
             return ycontrib
