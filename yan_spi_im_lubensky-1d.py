@@ -13,7 +13,7 @@ S,H,U = 0.57,0.0088,4e-6
 G,F = 0.8,0.6
 
 # new stuff
-Ty,Tp,Tsp = 1.0,1.0,100
+Ty,Tp1,Tp2,Tsp = 1.0,1.0,30.0,100.0
 
 # all cells have the same internal model
 # 
@@ -25,7 +25,8 @@ IM.add_node('h','linear',params=[1.0/Th])
 IM.add_node('u','linear',params=[1.0/Tu])
 # additional yan business
 IM.add_node('y','linear',params=[1.0/Ty])
-IM.add_node('p','linear',params=[1.0/Tp])
+IM.add_node('p1','linear',params=[1.0/Tp1])
+IM.add_node('p2','linear',params=[1.0/Tp2])
 IM.add_node('sp','linear',params=[1.0/Tsp])
 
 # internal interactions
@@ -55,9 +56,9 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # with a -> sp
 IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
 # and sp -> p
-spp_edge = IM.add_edge('sp','p','hill_activ',params=[1.0/Tp,0.01,3])
+spp_edge = IM.add_edge('sp','p1','hill_activ',params=[1.0/Tp1,0.01,3])
 # p -> h
-IM.add_edge('p','h','hill_activ',params=[0.5/Th,1.0,8])
+IM.add_edge('p1','h','hill_activ',params=[0.6/Th,1.0,8])
 
 # u -> y
 uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,7e-6,4])
@@ -66,13 +67,15 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,7e-6,4])
 # IM.add_edge('h','p','hill_activ',params=[1.0/Tp,0.05,2])
 
 # yan business interactions
-# yan-pnt bistable switch:
 #  yan -| pnt 
-#  pnt -| yan
-IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.2,5])
-IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,7])
+#  spitz -| yan
+IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.95,5])
+IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.1,6])
 
-
+# for bimodal pnt peaks
+# completely speculative
+# yan -> pntp2
+IM.add_edge('y','p2','hill_activ',params=[2.0/Tp2,1.0,4])
 
 # need to make some cells 
 # the 1d case is easy:
@@ -100,7 +103,7 @@ sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
 # spi diffusion
-sim.add_interaction('sp','sp','diffusion',diff_connections,params=[5.0/Tsp])
+sim.add_interaction('sp','sp','diffusion',diff_connections,params=[6.0/Tsp])
 
 '''
 # no just lateral connections
@@ -114,8 +117,8 @@ sim.add_interaction('a','pnt','hill_activ',hill_connections,params=[1.0,1.5,4])
 sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.5,0.5,2])
 '''
 # start with only first cell up
-low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0}
+low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p1':0.0,'p2':0.0,'sp':0.0}
+high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p1':0.0,'p2':0.0,'sp':0.0}
 sim.set_initial_conditions(range(1,NCells),low_dict)
 sim.set_initial_conditions([0],high_dict)
 
@@ -153,6 +156,30 @@ def plot_species(species_name,times,x_coord,t):
     plt.show()
 
 plot_species('a',np.linspace(0.0,150,8),x_coord,t)
+
+def plot_pnt(times,x_coord,t):
+    tindices = [np.abs(t-v).argmin() for v in times]
+    astatus = np.zeros((NCells,len(tindices)))
+    for i in xrange(NCells):
+        for j in xrange(len(tindices)):
+            astatus[i,j] += cdata[i][tindices[j],IM.get_node_id('p1')]
+            astatus[i,j] += cdata[i][tindices[j],IM.get_node_id('p2')]
+            
+    '''
+    plt.figure()
+    plt.scatter(x_coord,np.zeros(NCells),
+                c=astatus,s=50,marker='s',edgecolors='none')
+    plt.show()
+    '''
+    # plot along x axis
+    plt.figure()
+    colors = cm.Dark2(np.linspace(0, 1, len(tindices)))
+    for j in xrange(len(tindices)):
+        plt.scatter(x_coord,astatus[:,j],color=colors[j])
+    plt.legend(['%.1f'% t for t in times],loc='best')
+    plt.title('p1+p2')
+    plt.show()
+    
 
 def plot_cell(cid,(times),t):
     tstart,tend = [np.abs(t-v).argmin() for v in times]
