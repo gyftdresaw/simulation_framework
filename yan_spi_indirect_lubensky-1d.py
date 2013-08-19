@@ -55,9 +55,9 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # with a -> sp
 IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
 # and sp -> p
-spp_edge = IM.add_edge('sp','p','hill_activ',params=[6.0/Tp,0.5,1])
+spp_edge = IM.add_edge('sp','p','hill_activ',params=[1.0/Tp,0.015,4])
 # p -> h
-IM.add_edge('p','h','hill_activ',params=[1.0/Th,1.0,8])
+IM.add_edge('p','h','hill_activ',params=[0.15/Th,0.1,8])
 
 # u -> y
 uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
@@ -70,14 +70,14 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,4e-6,6])
 #  yan -| pnt --> not yet
 #  pnt -| yan
 # IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,7])
+IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,5])
 
 
 
 # need to make some cells 
 # the 1d case is easy:
 # in our 'lattice', all the cells are distance 1 apart
-NCells = 40
+NCells = 60
 cells = [Cell([x]) for x in np.linspace(1,NCells,NCells)]
 
 # add these cells to the simulation
@@ -131,7 +131,7 @@ import matplotlib.cm as cm
 x_coord = np.linspace(1,NCells,NCells)
 
 # plot species at various times
-def plot_species(species_name,times,x_coord,t):
+def plot_species(species_name,times):
     tindices = [np.abs(t-v).argmin() for v in times]
     astatus = np.zeros((NCells,len(tindices)))
     for i in xrange(NCells):
@@ -148,13 +148,13 @@ def plot_species(species_name,times,x_coord,t):
     colors = cm.Dark2(np.linspace(0, 1, len(tindices)))
     for j in xrange(len(tindices)):
         plt.scatter(x_coord,astatus[:,j],color=colors[j])
-    plt.legend(['%.1f'% t for t in times],loc='best')
+    plt.legend(['%.1f'% time for time in times],loc='best')
     plt.title(species_name)
     plt.show()
 
-plot_species('a',np.linspace(0.0,150,8),x_coord,t)
+plot_species('a',np.linspace(0.0,150,8))
 
-def plot_cell(cid,(times),t):
+def plot_cell(cid,times):
     tstart,tend = [np.abs(t-v).argmin() for v in times]
     plt.figure()
     plt.plot(t[tstart:tend],cdata[cid][tstart:tend,:])

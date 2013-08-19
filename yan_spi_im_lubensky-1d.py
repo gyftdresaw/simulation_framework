@@ -56,7 +56,7 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # with a -> sp
 IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
 # and sp -> p
-spp_edge = IM.add_edge('sp','p1','hill_activ',params=[1.0/Tp1,0.01,3])
+spp_edge = IM.add_edge('sp','p1','hill_activ',params=[0.8/Tp1,0.01,3])
 # p -> h
 IM.add_edge('p1','h','hill_activ',params=[0.15/Th,0.2,8])
 
@@ -69,7 +69,7 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,7e-6,4])
 # yan business interactions
 #  yan -| pnt 
 #  spitz -| yan
-IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.95,5])
+IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.9,5])
 IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.1,6])
 
 # for bimodal pnt peaks
