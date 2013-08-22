@@ -67,9 +67,9 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,1e-4,6])
 
 # yan business interactions
 # yan-pnt bistable switch:
-#  yan -| pnt --> not yet
+#  yan -| pnt
 #  pnt -| yan
-# IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
+IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,0.8,0.5,2])
 IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,6])
 
 
