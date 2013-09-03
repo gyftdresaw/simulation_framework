@@ -149,7 +149,7 @@ def plot_species(species_name,times):
     for j in xrange(len(tindices)):
         plt.scatter(x_coord,astatus[:,j],color=colors[j])
     plt.legend(['%.1f'% time for time in times],loc='best')
-    plt.title(species_name)
+    plt.title(species_name,fontsize=24)
     plt.show()
 
 def plot_all_species(times):

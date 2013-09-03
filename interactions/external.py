@@ -8,7 +8,7 @@ class Diffusion:
     # connections is a (total_cells x total_cells) boolean matrix 
     # defining which cells interact
     # True for interaction
-    def __init__(self,connections,cells,params=None):
+    def __init__(self,connections,cells,BCs,params=None):
         self.external = True
         self.num_params = 1 # includes constant prefactor
         self.params_set = False
@@ -20,6 +20,7 @@ class Diffusion:
         self.dist_pre = None # (total_cells x total_cells)
         self.set_dist_pre(cells)
         self.cmask = ~connections # in mask, True removes the entry
+        self.set_BC_pre(BCs,connections)
     def set_dist_pre(self,cells):
         # should maybe check that all cells have a position set
         # we're going to use scipy distance helpers
@@ -35,6 +36,24 @@ class Diffusion:
         masked_dists = np.ma.array(distances,mask = dmask,fill_value=0)
         invert_dists = np.ma.divide(1.0,masked_dists)
         self.dist_pre = invert_dists.filled()
+        return
+    # to be called after set_dist_pre
+    # uses BCs to modify dist_pre to mimic 
+    # the appropriate boundary conditions
+    def set_BC_pre(self,BCs,connections):
+        multiplier = np.ones(np.shape(self.dist_pre))
+        for (type,cid_list) in BCs:
+            if type == 'ref_on':
+                # "reflect on" boundary cells
+                # don't multiply other cells on boundary
+                dont_mult = np.ones(np.shape(self.dist_pre)) > 0
+                for cid in cid_list:
+                    dont_mult[cid,:] = False
+                    dont_mult[cid,cid_list] = True
+                mult_factor = np.ones(np.shape(self.dist_pre))
+                mult_factor[(connections * (~dont_mult) > 0)] = 2.0
+                multiplier *= mult_factor
+        self.dist_pre *= multiplier # now dist_pre accounts for BC duplicates
         return
     def set_params(self,params):
         self.C = params[0]
@@ -66,7 +85,7 @@ class HillActivation:
     # defining which cells interact
     # True for interaction
     # for now doesn't use cell properties
-    def __init__(self,connections,is_mod=False,mod_type=None,params=None):
+    def __init__(self,connections,BCs,is_mod=False,mod_type=None,params=None):
         self.external = True
         self.num_params = 1 # includes constant prefactor
         self.params_set = False
@@ -75,6 +94,25 @@ class HillActivation:
         if not params is None:
             self.set_params(params)
         self.cmask = ~connections # in mask, True removes the entry
+        self.BC_mult = None # (total_cells x total_cells) BC mult factor
+        self.set_BC_pre(self,BCs,connections)
+    # uses BCs to modify BC_mult to mimic 
+    # the appropriate boundary conditions
+    def set_BC_pre(self,BCs,connections):
+        multiplier = np.ones(np.shape(self.dist_pre))
+        for (type,cid_list) in BCs:
+            if type == 'ref_on':
+                # "reflect on" boundary cells
+                # don't multiply other cells on boundary
+                dont_mult = np.ones(np.shape(self.dist_pre)) > 0
+                for cid in cid_list:
+                    dont_mult[cid,:] = False
+                    dont_mult[cid,cid_list] = True
+                mult_factor = np.ones(np.shape(self.dist_pre))
+                mult_factor[(connections * (~dont_mult) > 0)] = 2.0
+                multiplier *= mult_factor
+        self.BC_mult = multiplier # now dist_pre accounts for BC duplicates
+        return
     # C (x/A)^n / (1 + (x/A)^n)
     # params order: [C A n]
     def set_params(self,params):
@@ -88,7 +126,7 @@ class HillActivation:
         lower,upper = im_bounds
 
         # calculate contributions
-        hill_contribs = ( self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) )
+        hill_contribs = ( self.C * (x/self.A)**self.n / (1 + (x/self.A)**self.n) ) * self.BC_mult[lower:upper,:]
         # apply connection mask
         cmask_slice = self.cmask[lower:upper,:]
         masked_contribs = np.ma.array(hill_contribs,mask=cmask_slice,fill_value=0)
@@ -99,10 +137,10 @@ class HillActivation:
 
 
 # deal with getting the right interaction model
-def get_int_model(type,connections,cells,is_mod=False,mod_type=None,params=None):
+def get_int_model(type,connections,cells,BCs,is_mod=False,mod_type=None,params=None):
     if type == 'diffusion':
-        return Diffusion(connections,cells,params)
+        return Diffusion(connections,cells,BCs,params)
     elif type == 'hill_activ':
-        return HillActivation(connections,is_mod,mod_type,params)
+        return HillActivation(connections,BCs,is_mod,mod_type,params)
     else:
         return None

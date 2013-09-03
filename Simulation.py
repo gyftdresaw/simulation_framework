@@ -172,6 +172,7 @@ class Cell:
             self.IC[i] = IC[self.IM.nodes[i].name]
         return 
 
+
 # wrapper for interactions
 class Interaction:
     # IM_id only relevant if interaction is a mod of an internal edge
@@ -211,6 +212,7 @@ class Simulation:
         self.interactions = [] # list of cell-cell interactions
         self.int_counter = 0 # for generating int_id's
         self.modulators = [] # list of time-dependent modulators
+        self.BCs = [] # list of boundary conditions: (type,cell_id_list) 
         
     def add_cell(self,cell):
         self.cells.append(cell)
@@ -238,6 +240,12 @@ class Simulation:
             c.set_IC(IC)
         return
 
+    # need to be able to specify boundary conditions as well
+    def set_boundary_conditions(self,cell_id_list,BC):
+        # string BC specifies what kind of boundary condition
+        self.BCs.append((BC,cell_id_list))
+        return
+
     # need to set constants for each 
     # it would probably be easier to do this with the internal model
     # but might be better (for redundancy and simplification) to do here
@@ -248,7 +256,7 @@ class Simulation:
     def add_interaction(self,from_node,to,type,connections,IM_id=None,is_mod=False,mod_type=None,params=None):
         int_id = self.int_counter
         self.int_counter += 1
-        new_model = extern.get_int_model(type,connections,self.cells,is_mod,mod_type,params)
+        new_model = extern.get_int_model(type,connections,self.cells,self.BCs,is_mod,mod_type,params)
         new_interaction = Interaction(from_node,to,new_model,int_id,IM_id)
         self.interactions.append(new_interaction)
         return int_id

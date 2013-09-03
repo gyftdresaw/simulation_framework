@@ -13,7 +13,8 @@ S,H,U = 0.57,0.0088,4e-6
 G,F = 0.8,0.6
 
 # new stuff
-Ty,Tp,Tsp = 20.0,1.0,100
+Ty,Tp,Tsp = 20.0,1.0,20.0
+Tm = 100.0
 
 # all cells have the same internal model
 # 
@@ -27,6 +28,8 @@ IM.add_node('u','linear',params=[1.0/Tu])
 IM.add_node('y','linear',params=[1.0/Ty])
 IM.add_node('p','linear',params=[1.0/Tp])
 IM.add_node('sp','linear',params=[1.0/Tsp])
+# external slow modulator
+IM.add_node('m','linear',params=[1.0/Tm])
 
 # internal interactions
 # lubensky
@@ -57,7 +60,7 @@ IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
 # and sp -> p
 spp_edge = IM.add_edge('sp','p','hill_activ',params=[1.0/Tp,0.015,4])
 # p -> h
-IM.add_edge('p','h','hill_activ',params=[0.1/Th,0.1,8])
+IM.add_edge('p','h','hill_activ',params=[0.05/Th,0.1,8])
 
 # u -> y
 uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,1e-4,6])
@@ -68,11 +71,15 @@ uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,1e-4,6])
 # yan business interactions
 # yan-pnt bistable switch:
 #  yan -| pnt
-#  pnt -| yan
+#  sp -| yan
 IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,0.8,0.5,2])
-IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,6])
+IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.145,20])
 
-
+# mystery species m things
+# u -> m
+IM.add_edge('u','m','hill_activ',params=[1.0/Tm,4e-6,6])
+# m -| yan
+IM.add_edge('m',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.7,3])
 
 # need to make some cells 
 # the 1d case is easy:
@@ -100,7 +107,7 @@ sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
 # spi diffusion
-sim.add_interaction('sp','sp','diffusion',diff_connections,params=[7.0/Tsp])
+sim.add_interaction('sp','sp','diffusion',diff_connections,params=[5.0/Tsp])
 
 '''
 # no just lateral connections
@@ -114,8 +121,8 @@ sim.add_interaction('a','pnt','hill_activ',hill_connections,params=[1.0,1.5,4])
 sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.5,0.5,2])
 '''
 # start with only first cell up
-low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0}
+low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0,'m':0.0}
+high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0,'m':0.0}
 sim.set_initial_conditions(range(0,NCells),low_dict)
 sim.set_initial_conditions([3],high_dict)
 
