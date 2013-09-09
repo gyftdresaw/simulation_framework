@@ -97,6 +97,9 @@ im_id = sim.add_internal_model(IM)
 # set all cells to have the same internal model
 sim.set_internal_model(range(NCells),im_id)
 
+# set boundary conditions before setting intercellular interactions
+sim.set_boundary_conditions([0],'ref_on')
+
 # cells adjacent to one another are connected
 # for diffusion we include main diagonal
 # equivalent to 3 wide diagonal
@@ -124,10 +127,10 @@ sim.add_interaction('a','notch','hill_activ',hill_connections,params=[1.5,0.5,2]
 low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0,'m':0.0}
 high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0,'y':0.0,'p':0.0,'sp':0.0,'m':0.0}
 sim.set_initial_conditions(range(0,NCells),low_dict)
-sim.set_initial_conditions([3],high_dict)
+sim.set_initial_conditions([0],high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,200,100)
+t = np.linspace(0,225,100)
 cdata = sim.simulate(t)
 print 'simulation done'
 
