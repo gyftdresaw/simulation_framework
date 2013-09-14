@@ -137,6 +137,7 @@ print 'simulation done'
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.gridspec as gridspec
 
 x_coord = np.linspace(1,NCells,NCells)
 
@@ -174,3 +175,58 @@ def plot_cell(cid,times):
     plt.plot(t[tstart:tend],cdata[cid][tstart:tend,:])
     plt.legend(IM.get_node_names())
     plt.show()
+
+
+# differentiate cell types
+def get_r8s(time):
+    tindex = np.abs(t-time).argmin()
+    return [i for i in xrange(NCells) if cdata[i][tindex,IM.get_node_id('u')] > 0.010]
+
+def get_r25s(time):
+    r25_indices = [ [r8-1,r8+1] for r8 in get_r8s(time)]
+    # not the most readable just flattens the list
+    return [c for pair in r25_indices for c in pair if c >= 0 and c < NCells]
+
+def get_progenitors(time):
+    r8s = get_r8s(time)
+    r25s = get_r25s(time)
+    return [c for c in xrange(NCells) if not c in r8s and not c in r25s]
+
+
+## plot based on these categorizations
+
+def plot_cell_species(species_name,time):
+    tindex = np.abs(t-time).argmin()
+    astatus = np.zeros((NCells,1))
+    for i in xrange(NCells):
+        astatus[i] = cdata[i][tindex,IM.get_node_id(species_name)]
+    r8s = get_r8s(time)
+    r25s = get_r25s(time)
+    progenitors = get_progenitors(time)
+    cell_types = [r8s,r25s,progenitors]
+    # plot along x axis
+    plt.figure()
+    gs = gridspec.GridSpec(2,1,height_ratios=[19,1])
+    # first plot values 
+    ax1 = plt.subplot(gs[0])
+    ax1.xaxis.grid(True,linewidth=0.1,linestyle='-',color='0.4');
+    colors = cm.Set1(np.linspace(0, 1, 10))
+    for j in xrange(len(cell_types)):
+        plt.scatter(x_coord[cell_types[j]],astatus[cell_types[j]],color=colors[j],s=50)
+    plt.legend(['R8','R2/5','MP'],loc='best')
+    for j in xrange(len(cell_types)):
+        plt.plot(x_coord[cell_types[j]],astatus[cell_types[j]],'--',color=colors[j])
+    plt.title(species_name,fontsize=24)
+    plt.xlabel('Cell',labelpad=0)
+    # now plot stripes
+    ax2 = plt.subplot(gs[1],sharex=ax1)
+    xcorners = np.tile(np.linspace(0,NCells,NCells+1)+0.5,(2,1))
+    ycorners = np.tile(np.array([[0],[1]]),(1,NCells+1))
+    plt.pcolor(xcorners,ycorners,astatus.T,edgecolors='k')
+    ax2.xaxis.set_visible(False)
+    ax2.yaxis.set_visible(False)
+    plt.show()
+
+def plot_all_cell_species(time):
+    for n in IM.node_names.keys():
+        plot_cell_species(n,time)

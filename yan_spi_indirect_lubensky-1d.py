@@ -13,7 +13,7 @@ S,H,U = 0.57,0.0088,4e-6
 G,F = 0.8,0.6
 
 # new stuff
-Ty,Tp,Tsp = 20.0,1.0,100
+Ty,Tp,Tsp = 20.0,1.0,100.0
 
 # all cells have the same internal model
 # 
@@ -223,3 +223,4 @@ def plot_cell_species(species_name,time):
 def plot_all_cell_species(time):
     for n in IM.node_names.keys():
         plot_cell_species(n,time)
+
