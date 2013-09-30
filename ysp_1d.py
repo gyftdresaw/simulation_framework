@@ -123,7 +123,7 @@ sim.set_initial_conditions(range(0,NCells),low_dict)
 sim.set_initial_conditions([0],high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,200,100)
+t = np.linspace(0,250,150)
 cdata = sim.simulate(t)
 print 'simulation done'
 
@@ -204,17 +204,17 @@ def plot_cell_species(species_name,time):
     ax1.xaxis.grid(True,linewidth=0.1,linestyle='-',color='0.4');
     colors = cm.Set1(np.linspace(0, 1, 10))
     for j in xrange(len(cell_types)):
-        plt.scatter(x_coord[cell_types[j]],astatus[cell_types[j]],color=colors[j],s=50)
+        plt.scatter(NCells - x_coord[cell_types[j]],astatus[cell_types[j]],color=colors[j],s=50)
     plt.legend(['R8','R2/5','MP'],loc='best')
     for j in xrange(len(cell_types)):
-        plt.plot(x_coord[cell_types[j]],astatus[cell_types[j]],'--',color=colors[j])
-    plt.title(species_name,fontsize=24)
+        plt.plot(NCells - x_coord[cell_types[j]],astatus[cell_types[j]],'--',color=colors[j])
+    # plt.title(species_name,fontsize=24)
     plt.xlabel('Cell',labelpad=0)
     # now plot stripes
     ax2 = plt.subplot(gs[1],sharex=ax1)
     xcorners = np.tile(np.linspace(0,NCells,NCells+1)+0.5,(2,1))
     ycorners = np.tile(np.array([[0],[1]]),(1,NCells+1))
-    plt.pcolor(xcorners,ycorners,astatus.T,edgecolors='k')
+    plt.pcolor(xcorners,ycorners,astatus[::-1].T,edgecolors='k')
     ax2.xaxis.set_visible(False)
     ax2.yaxis.set_visible(False)
     plt.show()
