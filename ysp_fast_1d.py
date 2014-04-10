@@ -13,7 +13,9 @@ S,H,U = 0.57,0.0088,4e-6
 G,F = 0.8,0.6
 
 # new stuff
-Ty,Tp,Tsp = 20.0,1.0,100.0
+Ty,Tp,Tsp = 20.0,1.0,20
+# for only rapid yan decay in differentiating cells, we'll speed up spi from 100
+
 
 # all cells have the same internal model
 # 
@@ -53,31 +55,31 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 # replace a -> p
 # ap_edge = IM.add_edge('a','p','hill_activ',params=[1.0/Tp,0.5,4])
 # with a -> sp
-IM.add_edge('a','sp','hill_activ',params=[1.0/Tsp,0.6,8])
+IM.add_edge('a','sp','hill_activ',params=[2.0/Tsp,0.7,8])
 # and sp -> p
 spp_edge = IM.add_edge('sp','p','hill_activ',params=[1.0/Tp,0.015,4])
 # p -> h
 IM.add_edge('p','h','hill_activ',params=[0.1/Th,0.1,8])
 
 # u -> y
-uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,1e-4,6])
+uy_edge = IM.add_edge('u','y','hill_activ',params=[1.0/Ty,1e-5,6])
 
 # completely speculative
 # IM.add_edge('h','p','hill_activ',params=[1.0/Tp,0.05,2])
 
 # yan business interactions
 # yan-pnt bistable switch:
-#  yan -| pnt --> not yet
+#  yan -| pnt
 #  pnt -| yan
-# IM.add_edge('y',ap_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,1.0,1])
-IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.11,6])
+IM.add_edge('y',spp_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,0.8,0.5,2])
+IM.add_edge('sp',uy_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,0.26,16])
 
 
 
 # need to make some cells 
 # the 1d case is easy:
 # in our 'lattice', all the cells are distance 1 apart
-NCells = 30
+NCells = 60
 cells = [Cell([x]) for x in np.linspace(1,NCells,NCells)]
 
 # add these cells to the simulation
@@ -90,7 +92,7 @@ im_id = sim.add_internal_model(IM)
 # set all cells to have the same internal model
 sim.set_internal_model(range(NCells),im_id)
 
-# set boundary conditions
+# set boundary condition
 sim.set_boundary_conditions([0],'ref_on')
 
 # cells adjacent to one another are connected
@@ -103,7 +105,7 @@ sim.add_interaction('h','h','diffusion',diff_connections,params=[Dh/Th])
 sim.add_interaction('u','u','diffusion',diff_connections,params=[Du/Tu])
 
 # spi diffusion
-sim.add_interaction('sp','sp','diffusion',diff_connections,params=[7.0/Tsp])
+sim.add_interaction('sp','sp','diffusion',diff_connections,params=[3.0/Tsp])
 
 '''
 # no just lateral connections
@@ -123,7 +125,7 @@ sim.set_initial_conditions(range(0,NCells),low_dict)
 sim.set_initial_conditions([0],high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,200,100)
+t = np.linspace(0,250,150)
 cdata = sim.simulate(t)
 print 'simulation done'
 
@@ -169,7 +171,6 @@ def plot_cell(cid,times):
     plt.legend(IM.get_node_names())
     plt.show()
 
-
 # differentiate cell types
 def get_r8s(time):
     tindex = np.abs(t-time).argmin()
@@ -205,17 +206,17 @@ def plot_cell_species(species_name,time):
     ax1.xaxis.grid(True,linewidth=0.1,linestyle='-',color='0.4');
     colors = cm.Set1(np.linspace(0, 1, 10))
     for j in xrange(len(cell_types)):
-        plt.scatter(x_coord[cell_types[j]],astatus[cell_types[j]],color=colors[j],s=50)
+        plt.scatter(NCells - x_coord[cell_types[j]],astatus[cell_types[j]],color=colors[j],s=50)
     plt.legend(['R8','R2/5','MP'],loc='best')
     for j in xrange(len(cell_types)):
-        plt.plot(x_coord[cell_types[j]],astatus[cell_types[j]],'--',color=colors[j])
+        plt.plot(NCells - x_coord[cell_types[j]],astatus[cell_types[j]],'--',color=colors[j])
     plt.title(species_name,fontsize=24)
     plt.xlabel('Cell',labelpad=0)
     # now plot stripes
     ax2 = plt.subplot(gs[1],sharex=ax1)
     xcorners = np.tile(np.linspace(0,NCells,NCells+1)+0.5,(2,1))
     ycorners = np.tile(np.array([[0],[1]]),(1,NCells+1))
-    plt.pcolor(xcorners,ycorners,astatus.T,edgecolors='k')
+    plt.pcolor(xcorners,ycorners,astatus[::-1].T,edgecolors='k')
     ax2.xaxis.set_visible(False)
     ax2.yaxis.set_visible(False)
     plt.show()
@@ -223,4 +224,3 @@ def plot_cell_species(species_name,time):
 def plot_all_cell_species(time):
     for n in IM.node_names.keys():
         plot_cell_species(n,time)
-

@@ -315,7 +315,7 @@ class Simulation:
         return [i for i in self.interactions if i.to_edge==to_edge and i.to_IM==IM_id]
 
     # if IM_id is given, then we're looking for modulators to an internal edge
-    # if not, then we're looking fro modulators to an external edge
+    # if not, then we're looking for modulators to an external edge
     def get_modulators(self,to_edge,IM_id = None):
         return [m for m in self.modulators if m.to_edge==to_edge and m.to_IM==IM_id]
 
