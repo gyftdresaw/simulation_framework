@@ -455,7 +455,7 @@ class Simulation:
         # concat the flattened yprimes for each internal model
         return reduce(lambda x,y: np.append(x,y),flat_yprime)
 
-    def simulate(self,t):
+    def simulate(self,t,full_output=False):
         # make sure checks are satisfied
         if not self.simulation_ready():
             return
@@ -491,6 +491,9 @@ class Simulation:
                 cdata[cid] = np.empty((len(t),IM_nspecies[i]))
                 cdata[cid] = sol[:,sol_index:(sol_index+IM_nspecies[i])]
                 sol_index += IM_nspecies[i]
-
-        return cdata
+        
+        if full_output:
+            return cdata,info
+        else:
+            return cdata
 

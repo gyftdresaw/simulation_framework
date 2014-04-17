@@ -14,7 +14,7 @@ na,ns,nh,nu = 4,4,8,8
 ms,mh,mu = 4,4,6
 Ts,Th,Tu = 4.0,101.0,2.0
 Dh,Du = 200.0,0.16 # reducing Du by a little from 0.16
-S,H,U = 0.57,0.00107,4e-6 # decrease activation of H from 0.0088
+S,H,U = 0.57,0.0088,4e-6 # decrease activation of H from 0.0088
 G,F = 0.8,0.6
 
 # all cells have the same internal model
@@ -48,7 +48,7 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 
 # need to make some cells 
 # we need to work a little harder in 2d
-nrows = 20 # 13
+nrows = 35 # 13
 ncolumns = 16 # 16
 NCells = nrows * ncolumns
 
@@ -79,7 +79,7 @@ im_id = sim.add_internal_model(IM)
 sim.set_internal_model(range(NCells),im_id)
 
 # set up reflecting boundary conditions at bottom edge
-sim.set_boundary_conditions(range(ncolumns),'ref_on')
+# sim.set_boundary_conditions(range(ncolumns),'ref_on')
 sim.set_boundary_conditions(range((nrows-1)*ncolumns,nrows*ncolumns),'abs_on')
 
 # need to figure out which cells are connect to which
@@ -140,10 +140,10 @@ sim.add_interaction('u','u','diffusion',connections,params=([Du/Tu],Dmat))
 low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0}
 high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0}
 sim.set_initial_conditions(range(0,NCells),low_dict)
-sim.set_initial_conditions([4,12],high_dict)
+sim.set_initial_conditions([0,1,2,3,4,5,6,8,9,10,11,12,13,14,ncolumns*4+4,ncolumns*4+12],high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,250,150)
+t = np.linspace(0,350,150)
 cdata = sim.simulate(t)
 print 'simulation done'
 
