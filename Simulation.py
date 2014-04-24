@@ -76,8 +76,8 @@ class InternalModel:
 
         # set degradation of new node
         # call helper
-        self.set_node_degradation(name,degradation,params)
-        
+        if not degradation == None:
+            self.set_node_degradation(name,degradation,params)        
 
         return self.get_node(name)
 
@@ -357,6 +357,8 @@ class Simulation:
             # apply xcontrib, then multiply by multiplicative mods
             # for application need proper bounds
             ycontrib = contrib.model.apply(xcontrib,self.IM_bounds[IM_id])
+            # print 'xcontrib,ycontrib,IM'
+            # print xcontrib,ycontrib,IM_id
             for mod in ext_mods:
                 if mod.mod_type == 'mult':
                     ycontrib *= self.resolve_contribution(mod,ycurrent,IM_id,t)

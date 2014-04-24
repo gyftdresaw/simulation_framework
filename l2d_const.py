@@ -3,6 +3,8 @@ from scipy.spatial import Delaunay
 
 # 2d lubensky model 
 # using framework
+# 
+# first row of cells is given a constant source of h to propagate R8's
 
 # setup for internal model is exactly the same 
 # as in the 1d case
@@ -45,10 +47,28 @@ ha_edge = IM.add_edge('h','a','hill_activ',params=[G,H,mh])
 # u -| (h -> a)
 IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1.0,U,mu])
 
+## h source cells have an internal model without h connections/perturbations ##
+IM_source = InternalModel()
+IM_source.add_node('a','linear',params=[1.0])
+IM_source.add_node('s','linear',params=[1.0/Ts])
+IM_source.add_node('h') # MODIFIED no h degradation
+IM_source.add_node('u','linear',params=[1.0/Tu])
+
+# internal interactions
+# a -> a
+IM_source.add_edge('a','a','hill_activ',params=[1.0,Aa,na])
+
+# a -> s, s -> a
+IM_source.add_edge('a','s','hill_activ',params=[1.0/Ts,As,ns])
+IM_source.add_edge('s','a','hill_activ',params=[F,S,ms])
+
+# a -> u
+IM_source.add_edge('a','u','hill_activ',params=[1.0/Tu,Au,nu])
+# and no h related interactions
 
 # need to make some cells 
 # we need to work a little harder in 2d
-nrows = 40 # 13
+nrows = 25 # 13 (50)
 ncolumns = 16 # 16
 NCells = nrows * ncolumns
 
@@ -73,10 +93,18 @@ sim = Simulation()
 for i in xrange(NCells):
     sim.add_cell(cells[i])
 
+im_source_id = sim.add_internal_model(IM_source)
 im_id = sim.add_internal_model(IM)
 
-# set all cells to have the same internal model
-sim.set_internal_model(range(NCells),im_id)
+# set all first row cells to have source internal model
+sim.set_internal_model(range(ncolumns),im_source_id) # modified
+# set all cells but first row to have the same internal model
+sim.set_internal_model(range(ncolumns,NCells),im_id) # modified to source also
+
+##########################################################################
+# ORDERING BETWEEN ADDING AND SETTING INTERNAL MODELS MUST BE CONSISTENT #
+# THIS NEEDS TO BE FIXED                                                 #
+##########################################################################
 
 # set up reflecting boundary conditions at bottom edge
 # sim.set_boundary_conditions(range(ncolumns),'ref_on')
@@ -118,6 +146,12 @@ for i in xrange(nrows):
     connections[(i+1)*ncolumns-1,i*ncolumns] = True
     connections[i*ncolumns,(i+1)*ncolumns-1] = True
 
+# for sourcing h, we're going to eliminate diffusion out of the first row
+for i in xrange(NCells):
+    for j in xrange(NCells):
+        if i in range(ncolumns):
+            connections[i,j] = False 
+
 # calculate custom square distance matrix for periodic boundary conditions on diffusion
 Dmat = np.zeros((NCells,NCells))
 for i in xrange(NCells):
@@ -136,14 +170,17 @@ for i in xrange(NCells):
 sim.add_interaction('h','h','diffusion',connections,params=([Dh/Th],Dmat))
 sim.add_interaction('u','u','diffusion',connections,params=([Du/Tu],Dmat))
 
-# start with only first cell up
+# start with only first R8 row up
+h_const = 0.015
 low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0}
-sim.set_initial_conditions(range(0,NCells),low_dict)
-sim.set_initial_conditions([0,1,2,3,4,5,6,8,9,10,11,12,13,14,ncolumns*4+4,ncolumns*4+12],high_dict)
+first_low_dict = {'a':0.0,'s':0.0,'h':h_const,'u':0.0} # for first row h
+high_dict = {'a':1.0+F,'s':1.0,'h':h_const,'u':0.0} # template row has source h
+sim.set_initial_conditions(range(ncolumns,NCells),low_dict)
+sim.set_initial_conditions(range(ncolumns),first_low_dict)
+sim.set_initial_conditions([4,12],high_dict) # [4,12]
 
 print 'starting simulation'
-t = np.linspace(0,350,150)
+t = np.linspace(0,250,150)
 cdata = sim.simulate(t)
 print 'simulation done'
 

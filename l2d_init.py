@@ -3,6 +3,8 @@ from scipy.spatial import Delaunay
 
 # 2d lubensky model 
 # using framework
+# 
+# testing different starting conditions
 
 # setup for internal model is exactly the same 
 # as in the 1d case
@@ -48,7 +50,7 @@ IM.add_edge('u',ha_edge,'hill_inactiv',is_mod=True,mod_type='mult',params=[1.0,1
 
 # need to make some cells 
 # we need to work a little harder in 2d
-nrows = 40 # 13
+nrows = 60 # 13 (50)
 ncolumns = 16 # 16
 NCells = nrows * ncolumns
 
@@ -80,7 +82,11 @@ sim.set_internal_model(range(NCells),im_id)
 
 # set up reflecting boundary conditions at bottom edge
 # sim.set_boundary_conditions(range(ncolumns),'ref_on')
-sim.set_boundary_conditions(range((nrows-1)*ncolumns,nrows*ncolumns),'abs_on')
+# sim.set_boundary_conditions(range((nrows-1)*ncolumns,nrows*ncolumns),'abs_on')
+
+# sim.set_boundary_conditions(range(ncolumns),'ref_on')
+# sim.set_boundary_conditions(range((nrows-1)*ncolumns,nrows*ncolumns),'ref_on')
+
 
 # need to figure out which cells are connect to which
 connections = np.zeros((NCells,NCells)) > 0 # default boolean false array
@@ -138,12 +144,22 @@ sim.add_interaction('u','u','diffusion',connections,params=([Du/Tu],Dmat))
 
 # start with only first cell up
 low_dict = {'a':0.0,'s':0.0,'h':0.0,'u':0.0}
-high_dict = {'a':1.0+F,'s':1.0,'h':0.0,'u':0.0}
+med_dict = {'a':0.0,'s':0.0,'h':0.015,'u':4e-6} # start with some h and u in template
+high_dict = {'a':1.0+F,'s':1.0,'h':0.015,'u':4e-6} # start with some h and u (0.015 ss)
 sim.set_initial_conditions(range(0,NCells),low_dict)
-sim.set_initial_conditions([0,1,2,3,4,5,6,8,9,10,11,12,13,14,ncolumns*4+4,ncolumns*4+12],high_dict)
+# templating different numbers of rows of R8s
+ntemplate = 8
+sim.set_initial_conditions(range(0,ncolumns*(4*(ntemplate-1)+1)),med_dict)
+high_cells = []
+for i in xrange(ntemplate):
+    if i % 2 == 0:
+        high_cells += [ncolumns*4*i+4,ncolumns*4*i+12]
+    else:
+        high_cells += [ncolumns*4*i,ncolumns*4*i+8]
+sim.set_initial_conditions(high_cells,high_dict)
 
 print 'starting simulation'
-t = np.linspace(0,350,150)
+t = np.linspace(0,400,150)
 cdata = sim.simulate(t)
 print 'simulation done'
 

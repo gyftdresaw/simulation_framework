@@ -1,3 +1,6 @@
+# pickle
+*.p
+*.npz
 
 # Mac
 .DS_store
