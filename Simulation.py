@@ -303,7 +303,13 @@ class Simulation:
             low += ncells[i]
         self.IM_bounds = bounds
         return
-
+        
+    def get_IM(self,cid):
+        for i in xrange(len(self.IM_cells)):
+            if cid in self.IM_cells[i]:
+                return i
+        print 'cid not found'
+        return None
 
     # return all external interactions that affect this node
     def get_contributions(self,to_node):

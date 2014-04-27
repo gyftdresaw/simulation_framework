@@ -1,3 +1,6 @@
+# movies
+*.mpg
+
 # pickle
 *.p
 *.npz
