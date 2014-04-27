@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 # SLURM submission script for python jobs
 
@@ -15,4 +15,5 @@
 
 module load python
 
+echo "submitting $filename"
 python $filename
