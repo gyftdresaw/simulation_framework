@@ -5,6 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=hgudjonson@uchicago.edu
+#SBATCH --job-name=l2d
 
 # output will be nothing, just put into dummy file
 #SBATCH --output=slurm.out
@@ -14,4 +15,4 @@
 
 module load python
 
-python $1
+python $filename
